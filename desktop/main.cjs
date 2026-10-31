@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron')
+const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 
@@ -61,6 +61,109 @@ function registerSecretHandlers() {
   })
 }
 
+function registerWorkspaceHandlers() {
+  const { dialog } = require('electron')
+  const { exec } = require('node:child_process')
+  const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.turbo', 'coverage', '.idea', '.vscode', 'target', '__pycache__'])
+
+  const safeJoin = (root, rel) => {
+    const target = path.resolve(root, rel)
+    const base = path.resolve(root)
+    if (target !== base && !target.startsWith(base + path.sep)) throw new Error('路径越界')
+    return target
+  }
+
+  const walk = (root, dir, depth, out, limit) => {
+    if (depth > 4 || out.length >= limit) return
+    let entries = []
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    entries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
+    for (const entry of entries) {
+      if (out.length >= limit) return
+      if (entry.name.startsWith('.') && entry.name !== '.env.example') continue
+      const abs = path.join(dir, entry.name)
+      const rel = path.relative(root, abs).split(path.sep).join('/')
+      if (entry.isDirectory()) {
+        if (IGNORE.has(entry.name)) continue
+        out.push({ path: rel, name: entry.name, dir: true, depth })
+        walk(root, abs, depth + 1, out, limit)
+      } else {
+        let size = 0
+        try {
+          size = fs.statSync(abs).size
+        } catch {
+          /* ignore */
+        }
+        out.push({ path: rel, name: entry.name, dir: false, depth, size })
+      }
+    }
+  }
+
+  ipcMain.handle('workspace:open', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory'], title: '选择一个项目文件夹' })
+    if (result.canceled || !result.filePaths.length) return null
+    return { root: result.filePaths[0] }
+  })
+
+  ipcMain.handle('workspace:list', (_e, root) => {
+    if (!root || !fs.existsSync(root)) return { root, entries: [], truncated: false }
+    const out = []
+    walk(root, root, 0, out, 600)
+    return { root, entries: out, truncated: out.length >= 600 }
+  })
+
+  ipcMain.handle('workspace:read', (_e, root, rel) => {
+    const abs = safeJoin(root, rel)
+    const stat = fs.statSync(abs)
+    if (!stat.isFile()) throw new Error('不是文件')
+    if (stat.size > 2 * 1024 * 1024) return { content: '', size: stat.size, binary: false, tooLarge: true }
+    const buf = fs.readFileSync(abs)
+    const binary = buf.includes(0)
+    return { content: binary ? '' : buf.toString('utf8'), size: stat.size, binary, tooLarge: false }
+  })
+
+  ipcMain.handle('workspace:write', (_e, root, rel, content) => {
+    const abs = safeJoin(root, rel)
+    fs.writeFileSync(abs, content, 'utf8')
+    return { ok: true, size: Buffer.byteLength(content, 'utf8') }
+  })
+
+  const decode = (buf) => {
+    if (!buf || !buf.length) return ''
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buf)
+    } catch {
+      try {
+        // Windows 控制台常见 GBK 输出
+        return new TextDecoder('gbk').decode(buf)
+      } catch {
+        return buf.toString('utf8')
+      }
+    }
+  }
+
+  ipcMain.handle('workspace:exec', (_e, root, command) => {
+    return new Promise((resolve) => {
+      const started = Date.now()
+      exec(
+        command,
+        { cwd: root, timeout: 120000, maxBuffer: 4 * 1024 * 1024, windowsHide: true, encoding: 'buffer' },
+        (error, stdout, stderr) => {
+          resolve({
+            code: error && typeof error.code === 'number' ? error.code : error ? 1 : 0,
+            stdout: decode(stdout),
+            stderr: decode(stderr),
+            durationMs: Date.now() - started,
+          })
+        },
+      )
+    })
+  })
+}
 function loadBounds() {
   try {
     const raw = JSON.parse(fs.readFileSync(stateFile, 'utf8'))
@@ -159,6 +262,7 @@ function createWindow() {
 
 app.setAppUserModelId('com.sisqi.work')
 registerSecretHandlers()
+registerWorkspaceHandlers()
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)

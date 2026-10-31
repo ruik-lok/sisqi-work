@@ -25,7 +25,7 @@ const NAV: Array<{ id: PadRoute; label: string; icon: ReactNode }> = [
 
 const TITLES: Record<PadRoute, { title: string; sub: string }> = {
   chat: { title: '会话', sub: 'AI 会话工作台' },
-  projects: { title: '项目', sub: 'nexus-core · agent/harness-checkpoint' },
+  projects: { title: '项目', sub: '工作区 · 变更 · 终端' },
   agent: { title: 'Agent', sub: '任务、时间线与审批' },
   connectors: { title: '连接', sub: 'Connector、Skill 与 MCP' },
   settings: { title: '设置', sub: '模型与 API、设备、安全' },

@@ -100,6 +100,10 @@
 | 用量统计（请求 / Token / 估算费用 / 延迟） | 已实现 | 由 Provider usage 字段累计 |
 | 备份导出 / 导入（不含密钥） | 已实现 | JSON 文件下载与导入 |
 | Anthropic / Gemini 原生协议 | 未实现 | 仅 OpenAI 兼容；界面已移除两家种子 Provider 以免误导 |
+| 打开本机文件夹 / 文件树 | 已实现（桌面版） | 自动跳过 node_modules、.git、dist；目录越界读取被拒绝（实测 blocked） |
+| 编辑并保存文件 | 已实现（桌面版） | 编辑 README 后 Ctrl+S 写入，重新读取内容一致 |
+| 在工作区内执行命令 | 已实现（桌面版） | `echo` 与 `git status` 返回退出码与耗时；120s 超时、4MB 输出上限 |
+| 浏览器内的文件读写 | 不支持 | 浏览器无文件系统权限；界面提示改用桌面版 |
 ## 9. 规范外新增：Windows 桌面壳
 
 v2.0 规范面向 Android App，未包含桌面端。本次额外提供一个 Electron 壳（desktop/），仅用于在 Windows 上以原生窗口评审 Pro 三栏布局：

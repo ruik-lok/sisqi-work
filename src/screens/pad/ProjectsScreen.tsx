@@ -8,12 +8,16 @@ import { CodeEditor } from '../../components/panels/CodeEditor'
 import { Terminal } from '../../components/panels/Terminal'
 import { DiffView } from '../../components/panels/DiffView'
 import { useNexus } from '../../state/store'
+import { RealWorkspace } from '../../components/workspace/RealWorkspace'
+import { workspaceBridge, savedWorkspaceRoot, rememberWorkspaceRoot } from '../../lib/workspace'
 import { diffFiles } from '../../data/nexus'
 
 type DockTab = 'terminal' | 'changes'
 
 export function ProjectsScreen() {
   const { task, toast } = useNexus()
+  const [live, setLive] = useState(() => Boolean(workspaceBridge() && savedWorkspaceRoot()))
+  const [opening, setOpening] = useState(false)
   const [openPaths, setOpenPaths] = useState(['core/agent/harness/AgentLoop.kt', 'core/terminal/PtySession.kt'])
   const [activePath, setActivePath] = useState('core/agent/harness/AgentLoop.kt')
   const [dock, setDock] = useState<DockTab>('terminal')
@@ -34,6 +38,23 @@ export function ProjectsScreen() {
     })
   }
 
+  const openFolder = async () => {
+    const bridge = workspaceBridge()
+    if (!bridge) return
+    setOpening(true)
+    try {
+      const res = await bridge.open()
+      if (res?.root) {
+        rememberWorkspaceRoot(res.root)
+        setLive(true)
+      }
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  if (live) return <RealWorkspace />
+
   return (
     <div className="flex h-full min-h-0 bg-[var(--bg)]">
       <aside className="hidden w-[240px] shrink-0 border-r border-[var(--line)] bg-[var(--surface)] md:block">
@@ -47,6 +68,11 @@ export function ProjectsScreen() {
             agent/harness-checkpoint <ChevronDown size={12} className="text-[var(--faint)]" />
           </button>
           <Badge tone="neutral">相对 main · 4 个文件</Badge>
+          {workspaceBridge() && (
+            <Button size="sm" variant="secondary" className="ml-2" onClick={openFolder} disabled={opening}>
+              {opening ? '选择中…' : '打开本机文件夹'}
+            </Button>
+          )}
           <div className="ml-auto flex items-center gap-1">
             <Button size="sm" variant="ghost" icon={<Play size={13} />} onClick={() => toast({ title: '运行配置已启动', detail: '输出见终端', tone: 'accent' })}>
               运行

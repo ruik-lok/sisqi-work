@@ -8,17 +8,6 @@ export interface SecretBridge {
   delete: (id: string) => Promise<void>
 }
 
-declare global {
-  interface Window {
-    sisqi?: {
-      desktop?: boolean
-      platform?: string
-      versions?: { electron?: string; chrome?: string }
-      secrets?: SecretBridge
-    }
-  }
-}
-
 const LS_PREFIX = 'sisqi.secret.'
 
 const webStore: SecretBridge = {

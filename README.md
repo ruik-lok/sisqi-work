@@ -18,8 +18,9 @@
 - **备份与恢复**：导出 / 导入 JSON（会话、消息、Provider、模型、外观、用量），默认不含任何密钥。
 - **快捷键**：`Ctrl/⌘ K` 命令面板、`Ctrl/⌘ N` 新建会话、`Ctrl/⌘ ,` 打开设置。
 - **演示模式**：没有密钥时不会静默失败，回复由本地脚本生成，并在输入框上方与消息上标注「演示」。
+- **真实文件工作区（桌面版）**：打开本机文件夹，浏览文件树（自动跳过 node_modules/.git/dist），编辑并 `Ctrl/⌘ S` 保存，在项目目录内执行命令并查看退出码与耗时；路径越界会被拒绝。
 
-限制：目前只实现 OpenAI 兼容协议（`/chat/completions`）；Anthropic / Gemini 原生协议尚未接入。Agent 任务、设备画像、审批仍为演示数据。
+限制：目前只实现 OpenAI 兼容协议（`/chat/completions`）；Anthropic / Gemini 原生协议尚未接入。文件与命令执行仅在桌面版可用；Agent 任务、设备画像、审批仍为演示数据。
 ## 快速开始
 
 ```bash
@@ -129,9 +130,13 @@ docs/
   spec-audit.md             规范逐项对照
   design-system.md          v2 设计系统
   compose-mapping.md        Compose 落地映射（含 Insets 与楷体打包）
-  screenshots/              13 张界面截图
+  screenshots/              15 张界面截图（含真实工作区 15-workspace.png）
 scripts/
   check.mjs                 CDP 冒烟测试（审批 / 会话流式 / 命令面板 / 主题 / 项目 Diff）
+  mock-llm.mjs              本地 OpenAI 兼容 mock 服务（端到端验证真实流式对话）
+  live-e2e.mjs              真实对话端到端测试（Provider → 密钥 → 测试 → 模型 → 流式 → 用量）
+  workspace-e2e.mjs         工作区 IPC 测试（列目录 / 读写 / 越界拦截 / 执行命令）
+  workspace-ui.mjs          工作区 UI 测试（文件树 / 编辑保存 / 终端）
 ```
 
 ## 冒烟测试
