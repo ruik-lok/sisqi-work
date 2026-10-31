@@ -1,0 +1,281 @@
+﻿@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   思祁.Work · Design tokens v2.0
+   Solid Surface UI：不透明表面、背景色差 + 1px 边框 + 留白建立层级。
+   禁止毛玻璃 / backdrop blur / 大面积半透明叠层 / 发光。
+   主题：Arctic Blue（亮）· Midnight Blue（暗）· 跟随系统
+   ------------------------------------------------------------------ */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --font-ui: "Inter", "KaiTi", "STKaiti", "Kaiti SC", "楷体", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: var(--font-ui);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+}
+
+/* 亮色：Arctic Blue */
+:root,
+html[data-theme="light"] {
+  --bg: #f4f7fc;
+  --surface: #ffffff;
+  --surface-2: #eaf0f8;
+  --elevated: #ffffff;
+  --line: #dce5f0;
+  --line-strong: #c3d2e4;
+  --fg: #17263d;
+  --muted: #61738c;
+  --faint: #8290a3;
+  --accent: #1769d2;
+  --accent-soft: #e2eeff;
+  --on-accent: #ffffff;
+  --accent-8: rgba(23, 105, 210, 0.08);
+  --accent-14: rgba(23, 105, 210, 0.14);
+  --ok: #1c7a4e;
+  --ok-soft: #e3f3ea;
+  --warn: #94600a;
+  --warn-soft: #fdf0da;
+  --danger: #ad2a21;
+  --danger-soft: #fbe7e5;
+  --info: #1769d2;
+  --info-soft: #e2eeff;
+  --scrim: rgba(15, 27, 45, 0.42);
+  --shadow-1: 0 1px 2px rgba(23, 38, 61, 0.06);
+  --shadow-2: 0 12px 32px -12px rgba(23, 38, 61, 0.18);
+  color-scheme: light;
+}
+
+/* 暗色：Midnight Blue */
+html[data-theme="dark"] {
+  --bg: #0c1422;
+  --surface: #121e30;
+  --surface-2: #192940;
+  --elevated: #20334d;
+  --line: #263b57;
+  --line-strong: #35506f;
+  --fg: #f0f5ff;
+  --muted: #9aabc4;
+  --faint: #71839d;
+  --accent: #72b3ff;
+  --accent-soft: #1b3555;
+  --on-accent: #06152a;
+  --accent-8: rgba(114, 179, 255, 0.1);
+  --accent-14: rgba(114, 179, 255, 0.18);
+  --ok: #5fc08e;
+  --ok-soft: #16301f;
+  --warn: #e0a44e;
+  --warn-soft: #33240f;
+  --danger: #ff7a70;
+  --danger-soft: #3a1a18;
+  --info: #72b3ff;
+  --info-soft: #1b3555;
+  --scrim: rgba(4, 9, 16, 0.62);
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.2);
+  --shadow-2: 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-ui);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button,
+  [role="button"],
+  a,
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--faint) 45%, transparent);
+    border: 3px solid transparent;
+    border-radius: 99px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--faint);
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .caption {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--faint);
+  }
+
+  .label {
+    font-size: 0.75rem;
+    line-height: 1.1rem;
+    color: var(--muted);
+  }
+
+  /* 长路径、哈希、无空格串：允许在任意位置断行，避免撑破卡片 */
+  .wrap-any {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .surface-1 {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+  }
+
+  .anim-rise {
+    animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .anim-fade {
+    animation: fade 0.18s ease-out both;
+  }
+  .anim-pop {
+    animation: pop 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .anim-pulse {
+    animation: softPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.995);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes softPulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+}

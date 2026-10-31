@@ -1,0 +1,40 @@
+{
+  "name": "sisqi-work",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "思祁.Work — 个人 AI 开发工作站（UI 原型 + Windows 桌面壳）",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4317 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4318 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "desktop": "node desktop/launch.cjs",
+    "desktop:dev": "node desktop/launch.cjs --dev",
+    "desktop:build": "pnpm build && node desktop/launch.cjs",
+    "desktop:shot": "node desktop/launch.cjs --shot=docs/screenshots/14-windows-desktop.png"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^45.2.0",
+    "playwright-core": "^1.64.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "electron"
+    ]
+  }
+}
