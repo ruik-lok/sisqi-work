@@ -1,12 +1,12 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { ChevronDown, MessageSquarePlus, PanelLeft, Sparkles } from 'lucide-react'
 import { Badge, Button, IconButton, Segmented, StatusPill } from '../../components/ui/primitives'
 import { BottomSheet } from '../../components/ui/overlays'
-import { ChatThread, Composer, ContextPanel, SessionList } from '../../components/chat/Chat'
+import { ChatErrorBanner, ChatThread, Composer, ContextPanel, SessionList } from '../../components/chat/Chat'
 import { useNexus, type Density } from '../../state/store'
 
-export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
-  const { activeSession, messages, density: d, setDensity, newSession, toast } = useNexus()
+export function ChatScreen({ onOpenApproval, onOpenSettings }: { onOpenApproval: () => void; onOpenSettings: () => void }) {
+  const { activeSession, messages, density: d, setDensity, newSession, demoMode, toast, sendMessage, streaming } = useNexus()
   const [historyOpen, setHistoryOpen] = useState(false)
 
   if (d === 'lite') {
@@ -29,9 +29,10 @@ export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
           />
         </div>
         <ChatThread />
-        <Composer />
+        <ChatErrorBanner onOpenSettings={onOpenSettings} />
+        <Composer onOpenSettings={onOpenSettings} />
         <BottomSheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="会话历史">
-          <SessionList />
+          <SessionList onOpenSettings={onOpenSettings} />
         </BottomSheet>
       </div>
     )
@@ -40,7 +41,7 @@ export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
   return (
     <div className="flex h-full min-h-0 bg-[var(--bg)]">
       <aside className="hidden w-[268px] shrink-0 border-r border-[var(--line)] bg-[var(--surface)] md:block">
-        <SessionList />
+        <SessionList onOpenSettings={onOpenSettings} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col bg-[var(--bg)]">
@@ -48,12 +49,13 @@ export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
           <span className="truncate text-[14px] font-medium text-[var(--fg)]">{activeSession.title}</span>
           {activeSession.project && <Badge tone="neutral">{activeSession.project}</Badge>}
           <StatusPill
-            label={activeSession.status === 'running' ? '执行中' : activeSession.status === 'awaiting' ? '待确认' : '空闲'}
+            label={activeSession.status === 'running' ? '生成中' : activeSession.status === 'awaiting' ? '待确认' : '空闲'}
             tone={activeSession.status === 'running' ? 'accent' : activeSession.status === 'awaiting' ? 'warn' : 'neutral'}
             pulse={activeSession.status === 'running'}
           />
+          {demoMode && <Badge tone="warn">演示模式</Badge>}
           <div className="ml-auto flex items-center gap-1">
-            <IconButton label="会话操作" onClick={() => toast({ title: '会话操作', detail: '重命名、归档、收藏、导出', tone: 'neutral' })}>
+            <IconButton label="会话操作" onClick={() => toast({ title: '会话操作', detail: '在左侧会话卡片右侧的 ⋯ 菜单里重命名、置顶或删除', tone: 'neutral' })}>
               <ChevronDown size={16} />
             </IconButton>
             <IconButton label="新建会话" onClick={newSession}>
@@ -74,7 +76,7 @@ export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 {['给 Harness 加检查点恢复', '排查 Reno12 状态栏 Insets', '把 v2.0 规范拆成任务'].map((t) => (
-                  <Button key={t} size="sm" variant="secondary" onClick={() => toast({ title: '已放入输入框', detail: t, tone: 'neutral' })}>
+                  <Button key={t} size="sm" variant="secondary" disabled={streaming} onClick={() => sendMessage(t)}>
                     {t}
                   </Button>
                 ))}
@@ -84,11 +86,12 @@ export function ChatScreen({ onOpenApproval }: { onOpenApproval: () => void }) {
         ) : (
           <ChatThread />
         )}
-        <Composer />
+        <ChatErrorBanner onOpenSettings={onOpenSettings} />
+        <Composer onOpenSettings={onOpenSettings} />
       </div>
 
       <aside className="hidden w-[320px] shrink-0 border-l border-[var(--line)] bg-[var(--surface)] lg:block">
-        <ContextPanel onOpenApproval={onOpenApproval} />
+        <ContextPanel onOpenApproval={onOpenApproval} onOpenSettings={onOpenSettings} />
       </aside>
     </div>
   )

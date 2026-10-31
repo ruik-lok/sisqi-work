@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Check,
   ChevronDown,
@@ -85,7 +85,7 @@ function Screen({ children, w, h, scale, kind }: { children: ReactNode; w: numbe
 }
 
 function Stage() {
-  const { theme, setTheme, density, setDensity, setPaletteOpen, task, approvals, decideApproval, streaming, stopStreaming, toast } = useNexus()
+  const { theme, setTheme, density, setDensity, setPaletteOpen, task, approvals, decideApproval, streaming, stopStreaming, toast, newSession } = useNexus()
   const params = new URLSearchParams(window.location.search)
   const initialMode = (params.get('mode') as Mode | null) ?? (localStorage.getItem('sisqi.mode') as Mode | null) ?? (window.innerWidth < 760 ? 'phone' : 'pad')
   const [mode, setMode] = useState<Mode>(initialMode)
@@ -107,14 +107,25 @@ function Stage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const key = e.key.toLowerCase()
+      if (key === 'k') {
         e.preventDefault()
         setPaletteOpen(true)
+      } else if (key === 'n') {
+        e.preventDefault()
+        newSession()
+        setMode('pad')
+        setPadRoute('chat')
+      } else if (key === ',') {
+        e.preventDefault()
+        setMode('pad')
+        setPadRoute('settings')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setPaletteOpen])
+  }, [newSession, setPaletteOpen])
 
   const commands: Cmd[] = [
     { id: 'chat', label: '会话工作台', group: '跳转', icon: <MessagesSquare size={13} />, run: () => { setMode('pad'); setPadRoute('chat') } },

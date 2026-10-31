@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell } = require('electron')
+﻿const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 
@@ -9,6 +9,57 @@ const DEV_URL = 'http://127.0.0.1:4317/?mode=desktop'
 const distIndex = path.join(__dirname, '..', 'dist', 'index.html')
 
 const stateFile = path.join(app.getPath('userData'), 'window-state.json')
+const secretFile = path.join(app.getPath('userData'), 'secrets.json')
+
+function readSecrets() {
+  try {
+    return JSON.parse(fs.readFileSync(secretFile, 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function writeSecrets(data) {
+  fs.mkdirSync(path.dirname(secretFile), { recursive: true })
+  fs.writeFileSync(secretFile, JSON.stringify(data))
+  try {
+    fs.chmodSync(secretFile, 0o600)
+  } catch {
+    /* Windows 上忽略 */
+  }
+}
+
+function registerSecretHandlers() {
+  ipcMain.handle('secrets:get', (_event, id) => {
+    const all = readSecrets()
+    const entry = all[id]
+    if (!entry) return null
+    try {
+      if (entry.encrypted && safeStorage.isEncryptionAvailable()) {
+        return safeStorage.decryptString(Buffer.from(entry.value, 'base64'))
+      }
+      return Buffer.from(entry.value, 'base64').toString('utf8')
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('secrets:set', (_event, id, value) => {
+    const all = readSecrets()
+    const canEncrypt = safeStorage.isEncryptionAvailable()
+    const encoded = canEncrypt ? safeStorage.encryptString(value).toString('base64') : Buffer.from(value, 'utf8').toString('base64')
+    all[id] = { value: encoded, encrypted: canEncrypt }
+    writeSecrets(all)
+    return canEncrypt
+  })
+
+  ipcMain.handle('secrets:delete', (_event, id) => {
+    const all = readSecrets()
+    delete all[id]
+    writeSecrets(all)
+    return true
+  })
+}
 
 function loadBounds() {
   try {
@@ -51,6 +102,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false,
+      // 本地应用：允许直连用户配置的 API Base URL（跨域）
+      webSecurity: false,
     },
   })
 
@@ -105,6 +158,7 @@ function createWindow() {
 }
 
 app.setAppUserModelId('com.sisqi.work')
+registerSecretHandlers()
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 思祁.Work · v2.0 领域数据
  * 会话 / 模型 Provider / 模型 / 连接器 / 技能 / 用量
  * 数值与状态为原型演示数据，不代表真实账单或真机结论。
@@ -26,6 +26,7 @@ export interface ChatMessage {
   time: string
   tools?: Array<{ name: string; detail: string; state: 'done' | 'running' | 'blocked' }>
   streaming?: boolean
+  mode?: 'demo' | 'live'
 }
 
 export interface Provider {
@@ -137,19 +138,6 @@ export const providers: Provider[] = [
     route: 'direct',
   },
   {
-    id: 'p_anthropic',
-    name: 'Anthropic',
-    kind: 'anthropic',
-    baseUrl: 'https://api.anthropic.com',
-    keyMasked: 'sk-ant-••••••3c21',
-    enabled: true,
-    status: 'connected',
-    models: ['claude-opus-4.6', 'claude-sonnet-4.6'],
-    lastTest: '今天 12:05',
-    latencyMs: 638,
-    route: 'direct',
-  },
-  {
     id: 'p_deepseek',
     name: 'DeepSeek',
     kind: 'deepseek',
@@ -161,19 +149,6 @@ export const providers: Provider[] = [
     lastTest: null,
     latencyMs: null,
     route: 'direct',
-  },
-  {
-    id: 'p_gemini',
-    name: 'Google Gemini',
-    kind: 'gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com',
-    keyMasked: 'AIza••••••••••••',
-    enabled: false,
-    status: 'error',
-    models: ['gemini-3-pro'],
-    lastTest: '昨天 22:14',
-    latencyMs: null,
-    route: 'proxy',
   },
   {
     id: 'p_custom',
@@ -193,10 +168,7 @@ export const providers: Provider[] = [
 export const models: ModelInfo[] = [
   { id: 'm_gpt52', name: 'gpt-5.2', providerId: 'p_openai', contextK: 400, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具', '结构化', '推理'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
   { id: 'm_gpt52mini', name: 'gpt-5.2-mini', providerId: 'p_openai', contextK: 200, priceIn: 0.25, priceOut: 2, capabilities: ['文本', '工具', '结构化'], enabled: true, capabilitySource: '供应商元数据' },
-  { id: 'm_opus', name: 'claude-opus-4.6', providerId: 'p_anthropic', contextK: 200, priceIn: 15, priceOut: 75, capabilities: ['文本', '视觉', '工具', '推理'], enabled: true, capabilitySource: '供应商元数据' },
-  { id: 'm_sonnet', name: 'claude-sonnet-4.6', providerId: 'p_anthropic', contextK: 200, priceIn: 3, priceOut: 15, capabilities: ['文本', '视觉', '工具'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_ds', name: 'deepseek-reasoner', providerId: 'p_deepseek', contextK: 128, priceIn: 0.55, priceOut: 2.19, capabilities: ['文本', '推理'], enabled: true, capabilitySource: '实测' },
-  { id: 'm_gemini', name: 'gemini-3-pro', providerId: 'p_gemini', contextK: 1000, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具'], enabled: false, capabilitySource: '供应商元数据' },
   { id: 'm_qwen', name: 'qwen3-coder', providerId: 'p_custom', contextK: 256, priceIn: 0.3, priceOut: 1.2, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '实测' },
 ]
 

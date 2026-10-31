@@ -17,7 +17,7 @@ import { cn } from '../../lib/cn'
 import { Badge, Button, IconButton, StatusPill, taskTone } from '../../components/ui/primitives'
 import { BottomSheet, Menu, MenuItem } from '../../components/ui/overlays'
 import { Wordmark } from '../../components/brand/Mark'
-import { ChatThread, Composer, SessionList } from '../../components/chat/Chat'
+import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../components/chat/Chat'
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { connectors, models, usage } from '../../data/work'
@@ -89,7 +89,8 @@ export function PhoneShell({
         {route === 'chat' && (
           <div className="flex h-full min-h-0 flex-col">
             <ChatThread dense />
-            <Composer dense />
+            <ChatErrorBanner onOpenSettings={() => setRoute('settings')} />
+            <Composer dense onOpenSettings={() => setRoute('settings')} />
           </div>
         )}
 
@@ -231,7 +232,7 @@ export function PhoneShell({
       <div className="h-[16px] shrink-0 bg-[var(--surface)]" aria-hidden="true" />
 
       <BottomSheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="会话历史">
-        <SessionList compact />
+        <SessionList onOpenSettings={() => setHistoryOpen(false)} />
       </BottomSheet>
 
       <BottomSheet open={taskSheet} onClose={() => setTaskSheet(false)} title={task.title}>

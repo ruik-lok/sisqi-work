@@ -1,4 +1,4 @@
-﻿import { chromium } from 'playwright-core'
+import { chromium } from 'playwright-core'
 
 const scenario = process.env.SCENARIO || 'approval'
 const browser = await chromium.connectOverCDP('http://127.0.0.1:9344')
@@ -28,19 +28,19 @@ if (scenario === 'approval') {
 
 if (scenario === 'chat') {
   await page.goto('http://127.0.0.1:4317/?mode=pad&pad=chat', { waitUntil: 'load' })
-  await page.waitForTimeout(1200)
+  await page.evaluate(() => localStorage.removeItem('sisqi.state.v2'))
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForTimeout(900)
+  check('演示模式提示出现', (await page.getByText(/演示模式：这个 Provider 还没有 API Key/).count()) > 0)
   const input = page.getByLabel('消息输入')
-  await input.click()
   await input.fill('先给出计划，再开始执行')
   await input.press('Enter')
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(2600)
   check('用户消息已发送', (await page.getByText('先给出计划，再开始执行').count()) > 0)
-  await page.waitForTimeout(1600)
-  check('出现流式回复', (await page.getByText('停止生成').count()) > 0)
-  await page.getByRole('button', { name: /停止生成/ }).click()
-  await page.waitForTimeout(400)
-  check('可停止生成', (await page.getByText('停止生成').count()) === 0)
-  await page.screenshot({ path: 'shots/v2-chat.png' })
+  check('演示回复已生成', (await page.getByText(/配置好之后，同样的输入会真的发到模型/).count()) > 0)
+  await page.reload({ waitUntil: 'load' })
+  await page.waitForTimeout(900)
+  check('刷新后消息仍在', (await page.getByText('先给出计划，再开始执行').count()) > 0)
 }
 
 if (scenario === 'palette') {
@@ -69,7 +69,6 @@ if (scenario === 'theme') {
   check('切换为 Arctic Blue', theme === 'light', String(theme))
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
   check('亮色背景生效', bg.includes('244') || bg.includes('247'), bg)
-  await page.screenshot({ path: 'shots/v2-light.png' })
 }
 
 if (scenario === 'projects') {

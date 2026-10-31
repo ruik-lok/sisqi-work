@@ -168,7 +168,7 @@ export function PadShell({
         </header>
 
         <main className="min-h-0 flex-1 overflow-hidden">
-          {route === 'chat' && <ChatScreen onOpenApproval={onOpenApproval} />}
+          {route === 'chat' && <ChatScreen onOpenApproval={onOpenApproval} onOpenSettings={() => setRoute('settings')} />}
           {route === 'projects' && <ProjectsScreen />}
           {route === 'agent' && <AgentScreen onOpenApproval={onOpenApproval} />}
           {route === 'connectors' && <ConnectorsScreen />}

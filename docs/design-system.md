@@ -1,4 +1,4 @@
-﻿# 思祁.Work 设计系统 v2.0
+# 思祁.Work 设计系统 v2.0
 
 Premium Professional Workstation：Clean、Precise、Minimal、Refined、Technical、Consistent。  
 **Solid Surface UI**：以背景色差、1px 边框、留白与字重建立层级；禁止毛玻璃、Backdrop Blur、大面积半透明叠层、模糊浮层与发光边框。
@@ -90,6 +90,15 @@ Premium Professional Workstation：Clean、Precise、Minimal、Refined、Technic
 
 ---
 
+### 会话状态
+
+| 状态 | 表现 |
+|---|---|
+| 空会话 | 品牌标记 + 一句话 + 三个建议（点击直接发送） |
+| 流式生成 | 光标脉冲 + 输入框变为「停止」；可随时中止 |
+| 演示模式 | 输入框上方一条浅色提示 + 「配置模型」按钮；消息角标「演示」 |
+| 请求失败 | 输入框上方错误条：标题（含 HTTP 状态）、可执行建议、原始摘要、「模型设置」入口 |
+| 已生成 | 悬停出现复制 / 重新生成；不展示假进度 |
 ## 5. 长文本与溢出（v2.0.1 修订）
 
 卡片、对话与时间线里的路径、哈希、URL 都是长 token，必须显式处理，否则会撑破布局：
