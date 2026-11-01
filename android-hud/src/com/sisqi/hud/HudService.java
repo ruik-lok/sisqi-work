@@ -42,9 +42,12 @@ public class HudService extends Service {
     private static final int PORT = 8765;
 
     private WindowManager wm;
-    private FrameLayout root;
+    private FrameLayout rippleRoot;
     private RippleView ripple;
     private TextView pill;
+    private WindowManager.LayoutParams pillParams;
+    private int pillX = 24;
+    private int pillY = 180;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private ServerSocket server;
     private volatile boolean running = false;
@@ -79,7 +82,11 @@ public class HudService extends Service {
         } catch (Exception ignore) {
         }
         try {
-            if (root != null && wm != null) wm.removeView(root);
+            if (rippleRoot != null && wm != null) wm.removeView(rippleRoot);
+        } catch (Exception ignore) {
+        }
+        try {
+            if (pill != null && wm != null) wm.removeView(pill);
         } catch (Exception ignore) {
         }
         super.onDestroy();
@@ -93,26 +100,13 @@ public class HudService extends Service {
             return;
         }
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-        root = new FrameLayout(this);
-        ripple = new RippleView(this);
-        root.addView(ripple, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-
-        pill = new TextView(this);
-        pill.setTextColor(Color.WHITE);
-        pill.setTextSize(13);
-        pill.setPadding(dp(14), dp(8), dp(14), dp(8));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#E01F2330"));
-        bg.setCornerRadius(dp(18));
-        bg.setStroke(dp(1), Color.parseColor("#664D6BFE"));
-        pill.setBackground(bg);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.topMargin = dp(64);
-        root.addView(pill, lp);
-
         int type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+
+        // 1) 全屏透明绘制层：只画涟漪/轨迹，不接收触摸
+        rippleRoot = new FrameLayout(this);
+        ripple = new RippleView(this);
+        rippleRoot.addView(ripple, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        WindowManager.LayoutParams rippleParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 type,
@@ -121,12 +115,82 @@ public class HudService extends Service {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.START;
+        rippleParams.gravity = Gravity.TOP | Gravity.START;
         try {
-            wm.addView(root, params);
+            wm.addView(rippleRoot, rippleParams);
         } catch (Exception e) {
-            Log.w("HUD", "addView failed: " + e);
+            Log.w("HUD", "add ripple view failed: " + e);
         }
+
+        // 2) 胶囊：独立小窗口，可拖动，不遮挡点击以外区域
+        android.content.SharedPreferences sp = getSharedPreferences("hud", MODE_PRIVATE);
+        pillX = sp.getInt("x", 24);
+        pillY = sp.getInt("y", 180);
+
+        pill = new TextView(this);
+        pill.setTextColor(Color.WHITE);
+        pill.setTextSize(12);
+        pill.setPadding(dp(12), dp(7), dp(12), dp(7));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#E01F2330"));
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(dp(1), Color.parseColor("#664D6BFE"));
+        pill.setBackground(bg);
+
+        pillParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        pillParams.gravity = Gravity.TOP | Gravity.START;
+        pillParams.x = pillX;
+        pillParams.y = pillY;
+        try {
+            wm.addView(pill, pillParams);
+        } catch (Exception e) {
+            Log.w("HUD", "add pill failed: " + e);
+        }
+
+        // 拖动：按住胶囊移动；松手记住位置
+        pill.setOnTouchListener(new android.view.View.OnTouchListener() {
+            private float downRawX, downRawY;
+            private int startX, startY;
+            private boolean moved;
+
+            public boolean onTouch(android.view.View v, android.view.MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        downRawX = e.getRawX();
+                        downRawY = e.getRawY();
+                        startX = pillParams.x;
+                        startY = pillParams.y;
+                        moved = false;
+                        return true;
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        int dx = (int) (e.getRawX() - downRawX);
+                        int dy = (int) (e.getRawY() - downRawY);
+                        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+                        pillParams.x = startX + dx;
+                        pillParams.y = Math.max(0, startY + dy);
+                        try {
+                            wm.updateViewLayout(pill, pillParams);
+                        } catch (Exception ignore) {
+                        }
+                        return true;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        if (moved) {
+                            pillX = pillParams.x;
+                            pillY = pillParams.y;
+                            getSharedPreferences("hud", MODE_PRIVATE).edit().putInt("x", pillX).putInt("y", pillY).apply();
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
     }
 
     private void sendStatus(final String text) {
