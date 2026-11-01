@@ -1,0 +1,13 @@
+{
+  "name": "@sisqi/dsh-tool-hud",
+  "version": "0.1.0",
+  "description": "把 DSH 的操作状态推到手机状态栏流体云（配合 DSH HUD 小应用）",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": { ".": "./lib/index.js" },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.6",
+    "@deepseek-ai/cordis": "^4.0.1"
+  }
+}
