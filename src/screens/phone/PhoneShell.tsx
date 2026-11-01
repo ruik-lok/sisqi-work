@@ -7,12 +7,14 @@ import {
   FileText,
   FolderOpen,
   GitBranch,
+  X,
   FolderKanban,
   History,
   MessagesSquare,
   Plus,
   Plug,
   RefreshCw,
+  Search,
   Settings2,
   ShieldAlert,
   Sparkles,
@@ -33,6 +35,7 @@ import { deviceInfo, ramGb } from '../../lib/native-device'
 import { formatBytes, isTextMime, listFolder, nativeFolderAvailable, pickFolder, readDoc, type ProjectTree } from '../../lib/native-files'
 import { readGitInfo, shortRemote, type GitInfo } from '../../lib/git-info'
 import { readGitStatus, type GitStatus } from '../../lib/git-status'
+import { searchText, type SearchResult } from '../../lib/fs-search'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -427,6 +430,9 @@ function PhoneProjects() {
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<{ name: string; text: string; truncated?: boolean } | null>(null)
   const [git, setGit] = useState<GitInfo | null>(null)
+  const [query, setQuery] = useState('')
+  const [result, setResult] = useState<SearchResult | null>(null)
+  const [searching, setSearching] = useState(false)
   const [gitStatus, setGitStatus] = useState<{ tracked: number; status: GitStatus } | null>(null)
   const [hint, setHint] = useState('')
 
@@ -455,6 +461,38 @@ function PhoneProjects() {
     if (saved) void load(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const q = query.trim()
+    if (!tree || q.length < 2) {
+      setResult(null)
+      setSearching(false)
+      return
+    }
+    let cancelled = false
+    setSearching(true)
+    const timer = window.setTimeout(() => {
+      void searchText(tree.uri, q).then((res) => {
+        if (cancelled) return
+        setResult(res)
+        setSearching(false)
+      })
+    }, 350)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [query, tree])
+
+  const openHit = async (hit: { name: string; docId: string }) => {
+    if (!tree) return
+    const doc = await readDoc(tree.uri, hit.docId)
+    if (!doc) {
+      toast({ title: '读取失败', detail: hit.name, tone: 'danger' })
+      return
+    }
+    setPreview({ name: hit.name, text: doc.text, truncated: doc.truncated })
+  }
 
   const choose = async () => {
     const next = await pickFolder()
@@ -584,6 +622,47 @@ function PhoneProjects() {
         {hint && <p className="mt-2 px-1 text-[11.5px] text-[var(--danger)]">{hint}</p>}
 
         {tree && (
+          <label className="mt-2 flex h-10 items-center gap-2 rounded-[14px] bg-[var(--surface-2)] px-3">
+            <Search size={14} className="shrink-0 text-[var(--faint)]" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索目录内文本（输入 2 个字以上）"
+              className="w-full bg-transparent text-[13px] text-[var(--fg)] placeholder:text-[var(--faint)] focus:outline-none"
+            />
+            {query && (
+              <button onClick={() => setQuery('')} aria-label="清空搜索" className="shrink-0 text-[var(--faint)]">
+                <X size={14} />
+              </button>
+            )}
+          </label>
+        )}
+
+        {tree && query.trim().length >= 2 && (
+          <div className="mt-2 space-y-1.5">
+            {searching && <p className="px-1 py-3 text-center text-[11.5px] text-[var(--faint)]">搜索中…</p>}
+            {!searching && result && result.hits.length === 0 && (
+              <p className="px-1 py-4 text-center text-[12px] text-[var(--faint)]">没有匹配（已扫描 {result.scanned} 个文件）</p>
+            )}
+            {result?.hits.map((h) => (
+              <button
+                key={`${h.path}:${h.line}`}
+                onClick={() => void openHit({ name: h.path, docId: h.docId })}
+                className="block w-full rounded-[12px] bg-[var(--surface-2)] px-3 py-2 text-left"
+              >
+                <p className="truncate font-mono text-[11px] text-[var(--accent)]">
+                  {h.path}:{h.line}
+                </p>
+                <p className="mt-0.5 truncate font-mono text-[11.5px] text-[var(--muted)]">{h.text}</p>
+              </button>
+            ))}
+            {result?.truncated && !searching && (
+              <p className="px-1 text-[11px] text-[var(--faint)]">已扫描 {result.scanned} 个文件，结果到达上限；缩小关键字更准</p>
+            )}
+          </div>
+        )}
+
+        {tree && query.trim().length < 2 && (
           <div className="mt-2 space-y-1.5">
             {files.length === 0 && <p className="px-1 py-6 text-center text-[12px] text-[var(--faint)]">这个目录是空的</p>}
             {files.map((f) => (
