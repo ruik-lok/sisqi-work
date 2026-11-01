@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bell,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  FileText,
+  FolderOpen,
   FolderKanban,
   History,
   MessagesSquare,
   Plus,
   Plug,
+  RefreshCw,
   Settings2,
   ShieldAlert,
   Sparkles,
@@ -21,9 +25,10 @@ import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../compon
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { PhoneModels } from './PhoneModels'
-import { connectors, skills, usage } from '../../data/work'
+import { connectors, skills } from '../../data/work'
 import { modelLabel } from '../../lib/labels'
 import { deviceInfo, ramGb } from '../../lib/native-device'
+import { formatBytes, isTextMime, listFolder, nativeFolderAvailable, pickFolder, readDoc, type ProjectTree } from '../../lib/native-files'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -52,7 +57,7 @@ export function PhoneShell({
   setRoute: (r: PhoneRoute) => void
   onOpenApproval: () => void
 }) {
-  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId, pauseTask, resumeTask, cancelTask, toast } = useNexus()
+  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId, pauseTask, resumeTask, cancelTask, toast, usage } = useNexus()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [taskSheet, setTaskSheet] = useState(false)
   const [skillsOpen, setSkillsOpen] = useState(false)
@@ -245,12 +250,16 @@ export function PhoneShell({
 
             <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
               <div className="flex items-center justify-between">
-                <span className="text-[13.5px] text-[var(--fg)]">用量 · {usage.period}</span>
+                <span className="text-[13.5px] text-[var(--fg)]">用量 · 本机</span>
                 <Badge tone="neutral">{usage.requests} 次</Badge>
               </div>
               <p className="mt-1 num text-[11.5px] text-[var(--faint)]">
-                ${usage.costUsd.toFixed(2)} · 成功率 {usage.successRate}% · 平均 {usage.avgLatencyMs}ms
+                ${usage.costUsd.toFixed(3)} · 输入 {formatTokens(usage.promptTokens)} · 输出 {formatTokens(usage.completionTokens)}
               </p>
+              <p className="text-[11.5px] text-[var(--faint)]">
+                最近延迟 {usage.lastLatencyMs ? `${usage.lastLatencyMs}ms` : '—'} · 最近错误 {usage.lastErrorAt ?? '无'}
+              </p>
+              <p className="mt-1 text-[11px] text-[var(--faint)]">只统计本机成功请求；费用按模型单价估算，不等于供应商账单。</p>
             </section>
 
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-[var(--faint)]">思祁.Work 2.0 · 让想法，真正成为作品。</p>
@@ -398,139 +407,169 @@ export function PhoneShell({
   )
 }
 
-const PROJECTS = [
-  {
-    name: 'nexus-core',
-    lang: 'Kotlin',
-    branch: 'agent/harness-checkpoint',
-    dirty: 4,
-    changes: [
-      { file: 'core/agent/harness/CheckpointStore.kt', add: 62, del: 9 },
-      { file: 'core/agent/harness/AgentLoop.kt', add: 18, del: 4 },
-      { file: 'core/agent/harness/CheckpointStoreTest.kt', add: 41, del: 0 },
-      { file: 'gradle/libs.versions.toml', add: 2, del: 1 },
-    ],
-    commits: [
-      { sha: 'a1b2c3d', msg: 'feat(agent): 检查点幂等写入', time: '今天 14:02' },
-      { sha: '9f8e7d6', msg: 'fix(agent): 事件去重表', time: '昨天 18:40' },
-      { sha: '5c4b3a2', msg: 'chore: 升级 kotlin 2.1', time: '昨天 09:12' },
-    ],
-  },
-  {
-    name: 'orbit-api',
-    lang: 'TypeScript',
-    branch: 'main',
-    dirty: 0,
-    changes: [],
-    commits: [
-      { sha: 'b7c8d9e', msg: 'feat: 卫星坐标框架', time: '今天 11:20' },
-      { sha: 'e1f2a3b', msg: 'test: 开普勒边界用例', time: '昨天 16:55' },
-    ],
-  },
-  {
-    name: 'field-notes',
-    lang: 'Markdown',
-    branch: 'main',
-    dirty: 0,
-    changes: [],
-    commits: [{ sha: 'c3d4e5f', msg: 'docs: 周会记录与决策', time: '昨天 21:05' }],
-  },
-]
+const PROJECT_KEY = 'sisqi.project.uri'
+
+function formatTokens(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
 
 function PhoneProjects() {
   const { toast } = useNexus()
-  const [openName, setOpenName] = useState<string | null>(null)
-  const project = PROJECTS.find((p) => p.name === openName) ?? null
+  const [tree, setTree] = useState<ProjectTree | null>(null)
+  const [stack, setStack] = useState<ProjectTree[]>([])
+  const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState<{ name: string; text: string; truncated?: boolean } | null>(null)
+  const [hint, setHint] = useState('')
+
+  const load = async (uri: string, docId = '') => {
+    setBusy(true)
+    try {
+      const next = await listFolder(uri, docId)
+      if (!next) {
+        setHint('目录读取失败，可能是授权已失效，请重新选择文件夹')
+        return
+      }
+      setHint('')
+      setTree(next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    const saved = localStorage.getItem(PROJECT_KEY)
+    if (saved) void load(saved)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const choose = async () => {
+    const next = await pickFolder()
+    if (!next) return
+    localStorage.setItem(PROJECT_KEY, next.uri)
+    setStack([])
+    setHint('')
+    setTree(next)
+    toast({ title: '已接入文件夹', detail: `${next.name} · ${next.files.length} 项`, tone: 'ok' })
+  }
+
+  const refresh = async () => {
+    if (!tree) return
+    await load(tree.uri, tree.docId === '' ? '' : tree.docId)
+  }
+
+  const enter = (docId: string, name: string) => {
+    if (!tree) return
+    setStack((prev) => [...prev, tree])
+    void load(tree.uri, docId).then(() => toast({ title: '进入文件夹', detail: name, tone: 'neutral' }))
+  }
+
+  const back = () => {
+    const prev = stack[stack.length - 1]
+    if (!prev) return
+    setStack((s) => s.slice(0, -1))
+    setTree(prev)
+  }
+
+  const openFile = async (file: { name: string; docId: string; mime: string }) => {
+    if (!tree) return
+    if (!isTextMime(file.mime, file.name)) {
+      toast({ title: '暂不支持预览', detail: file.name, tone: 'warn' })
+      return
+    }
+    const doc = await readDoc(tree.uri, file.docId)
+    if (!doc) {
+      toast({ title: '读取失败', detail: file.name, tone: 'danger' })
+      return
+    }
+    setPreview({ name: file.name, text: doc.text, truncated: doc.truncated })
+  }
+
+  const files = tree ? [...tree.files].sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)) : []
+  const folderCount = files.filter((f) => f.dir).length
 
   return (
     <>
       <div className="h-full overflow-y-auto px-4 py-3">
-        <div className="space-y-2">
-          {PROJECTS.map((p) => (
-            <button
-              key={p.name}
-              onClick={() => setOpenName(p.name)}
-              className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
-            >
-              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--accent)]">
-                {p.name.slice(0, 2).toUpperCase()}
+        {tree ? (
+          <section className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] text-[var(--accent)]">
+                <FolderOpen size={16} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13.5px] text-[var(--fg)]">{p.name}</span>
-                <span className="block truncate text-[11px] text-[var(--faint)]">
-                  {p.lang} · {p.branch} · {p.dirty ? `${p.dirty} 个未提交变更` : '干净'}
+                <span className="block truncate text-[13.5px] text-[var(--fg)]">{tree.name || '项目文件夹'}</span>
+                <span className="block text-[11px] text-[var(--faint)]">
+                  {folderCount} 个文件夹 · {files.length - folderCount} 个文件{busy ? ' · 读取中…' : ''}
                 </span>
               </span>
-              <ChevronRight size={15} className="text-[var(--faint)]" />
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
-          <p className="text-[12px] text-[var(--fg)]">最近编辑</p>
-          <p className="mt-1 font-mono text-[11.5px] text-[var(--faint)]">core/agent/harness/AgentLoop.kt</p>
-          <p className="text-[11px] text-[var(--faint)]">分支 agent/harness-checkpoint · 检查点 ckpt_0007</p>
-        </div>
-        <p className="caption mt-3 px-1">手机不堆叠项目树、终端与多面板；复杂操作在平板 Pro 模式完成。</p>
+              <IconButton label="刷新目录" size="sm" onClick={() => void refresh()}>
+                <RefreshCw size={14} />
+              </IconButton>
+              <Button size="sm" variant="ghost" onClick={() => void choose()}>
+                更换
+              </Button>
+            </div>
+            {stack.length > 0 && (
+              <button onClick={back} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-[11.5px] text-[var(--muted)]">
+                <ChevronLeft size={12} /> 返回上一级
+              </button>
+            )}
+          </section>
+        ) : (
+          <section className="rounded-[18px] border border-dashed border-[var(--line-strong)] bg-[var(--surface)] p-4 text-center">
+            <span className="mx-auto grid size-11 place-items-center rounded-[14px] bg-[var(--surface-2)] text-[var(--accent)]">
+              <FolderOpen size={20} />
+            </span>
+            <p className="mt-2 text-[13.5px] text-[var(--fg)]">把项目接到真实文件夹</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--faint)]">
+              选择手机上的任意目录，列真实文件、看大小与修改时间、预览文本；只读，不会改动文件。
+            </p>
+            <Button size="sm" variant="primary" className="mt-2.5" icon={<FolderOpen size={14} />} onClick={() => void choose()} disabled={!nativeFolderAvailable()}>
+              选择文件夹
+            </Button>
+            {!nativeFolderAvailable() && <p className="mt-1.5 text-[11px] text-[var(--faint)]">目录选择仅在 APK 里可用</p>}
+          </section>
+        )}
+
+        {hint && <p className="mt-2 px-1 text-[11.5px] text-[var(--danger)]">{hint}</p>}
+
+        {tree && (
+          <div className="mt-2 space-y-1.5">
+            {files.length === 0 && <p className="px-1 py-6 text-center text-[12px] text-[var(--faint)]">这个目录是空的</p>}
+            {files.map((f) => (
+              <button
+                key={f.docId}
+                onClick={() => (f.dir ? enter(f.docId, f.name) : void openFile(f))}
+                className="flex w-full items-center gap-2.5 rounded-[14px] bg-[var(--surface-2)] px-3 py-2.5 text-left"
+              >
+                <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface)] text-[var(--muted)]">
+                  {f.dir ? <FolderOpen size={15} /> : <FileText size={15} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-[12.5px] text-[var(--fg)]">{f.name}</span>
+                  <span className="block text-[10.5px] text-[var(--faint)]">
+                    {f.dir ? '文件夹' : formatBytes(f.size)}
+                    {f.lastModified ? ` · ${new Date(f.lastModified).toLocaleDateString('zh-CN')}` : ''}
+                  </span>
+                </span>
+                <ChevronRight size={14} className="shrink-0 text-[var(--faint)]" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tree && <p className="caption mt-3 px-1">只读访问；写入、重命名与终端仍只在平板/桌面版的真实工作区里开放。</p>}
       </div>
 
-      <BottomSheet open={Boolean(project)} onClose={() => setOpenName(null)} title={project?.name} height="max-h-[82%]">
-        {project && (
+      <BottomSheet open={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.name} height="max-h-[84%]">
+        {preview && (
           <div className="px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Badge tone="neutral">{project.lang}</Badge>
-              <span className="truncate font-mono text-[11.5px] text-[var(--muted)]">{project.branch}</span>
-              <StatusPill
-                label={project.dirty ? `${project.dirty} 个变更` : '工作区干净'}
-                tone={project.dirty ? 'warn' : 'ok'}
-                className="ml-auto"
-              />
-            </div>
-
-            <p className="label mt-4">未提交变更</p>
-            {project.changes.length ? (
-              <div className="mt-1.5 space-y-1">
-                {project.changes.map((c) => (
-                  <div key={c.file} className="flex items-center gap-2 rounded-[10px] bg-[var(--surface-2)] px-2.5 py-1.5">
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-[var(--fg)]">{c.file}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-[var(--ok)]">+{c.add}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-[var(--danger)]">−{c.del}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-1.5 text-[12px] text-[var(--faint)]">工作区干净，没有待提交的改动。</p>
-            )}
-
-            <p className="label mt-4">最近提交</p>
-            <div className="mt-1.5 space-y-1.5">
-              {project.commits.map((c) => (
-                <div key={c.sha} className="flex items-baseline gap-2">
-                  <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg)]">{c.msg}</span>
-                  <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{c.time}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1"
-                onClick={() => toast({ title: '已在平板打开', detail: `${project.name} · Pro 模式`, tone: 'ok' })}
-              >
-                在平板打开
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="flex-1"
-                onClick={() => toast({ title: '路径已复制', detail: `~/projects/${project.name}`, tone: 'neutral' })}
-              >
-                复制路径
-              </Button>
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-[var(--faint)]">项目、变更与提交为演示数据；真实编辑与终端在平板/桌面版完成。</p>
+            <pre className="wrap-any whitespace-pre-wrap rounded-[14px] bg-[var(--surface-2)] p-3 font-mono text-[11.5px] leading-relaxed text-[var(--fg)]">
+              {preview.text}
+            </pre>
+            {preview.truncated && <p className="mt-2 text-[11px] text-[var(--warn)]">文件较大，只显示前 256 KB</p>}
           </div>
         )}
       </BottomSheet>

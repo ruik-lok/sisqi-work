@@ -5,6 +5,7 @@ import android.app.ActivityManager;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
+import android.provider.DocumentsContract;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.text.TextUtils;
@@ -47,7 +48,9 @@ public class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.local";
     private static final boolean DEBUG_AUDIT = true;
     private static final int REQ_PICK = 4711;
+    private static final int REQ_TREE = 4712;
     private String pickId;
+    private String treeId;
     private WebView web;
     private SecretStore secrets;
     private volatile boolean finished = false;
@@ -214,6 +217,56 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** 选择项目文件夹（SAF 目录授权，持久化读取权限） */
+        @JavascriptInterface
+        public void pickFolder(String id) {
+            treeId = id;
+            try {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                startActivityForResult(i, REQ_TREE);
+            } catch (Exception e) {
+                Log.w(TAG, "pickFolder failed: " + e);
+                emitFolder(id, "null");
+            }
+        }
+
+        /** 刷新目录（docId 为空表示根目录） */
+        @JavascriptInterface
+        public void listFolder(String id, String treeUri, String docId) {
+            try {
+                emitFolder(id, listTreeJson(Uri.parse(treeUri), docId));
+            } catch (Exception e) {
+                Log.w(TAG, "listFolder failed: " + e);
+                emitFolder(id, "null");
+            }
+        }
+
+        /** 读取文本文件内容（上限 256KB） */
+        @JavascriptInterface
+        public void readDoc(String id, String treeUri, String docId) {
+            try {
+                Uri doc = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(treeUri), docId);
+                InputStream is = getContentResolver().openInputStream(doc);
+                if (is == null) throw new IOException("no stream");
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n, total = 0;
+                while ((n = is.read(buf)) > 0 && total < 256 * 1024) {
+                    bos.write(buf, 0, n);
+                    total += n;
+                }
+                is.close();
+                JSONObject o = new JSONObject();
+                o.put("text", new String(bos.toByteArray(), StandardCharsets.UTF_8));
+                o.put("truncated", total >= 256 * 1024);
+                emitDoc(id, o.toString());
+            } catch (Exception e) {
+                Log.w(TAG, "readDoc failed: " + e);
+                emitDoc(id, "null");
+            }
+        }
+
         /** 系统文件选择器：图片给 dataUrl，文本给 text（沙盒内安全读取，不需要存储权限） */
         @JavascriptInterface
         public void pickFile(String id, String mime) {
@@ -233,6 +286,27 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_TREE) {
+            String id = treeId;
+            treeId = null;
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+                emitFolder(id, "null");
+                return;
+            }
+            Uri tree = data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception e) {
+                Log.w(TAG, "takePersistableUriPermission failed: " + e);
+            }
+            try {
+                emitFolder(id, listTreeJson(tree, null));
+            } catch (Exception e) {
+                Log.w(TAG, "list picked tree failed: " + e);
+                emitFolder(id, "null");
+            }
+            return;
+        }
         if (requestCode != REQ_PICK) return;
         String id = pickId;
         pickId = null;
@@ -276,6 +350,84 @@ public class MainActivity extends Activity {
             Log.w(TAG, "read picked file failed: " + e);
             emitFile(id, "null");
         }
+    }
+
+    private String listTreeJson(Uri tree, String docId) throws Exception {
+        String rootDocId = docId == null || docId.isEmpty() ? DocumentsContract.getTreeDocumentId(tree) : docId;
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootDocId);
+        String[] cols = new String[]{
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        };
+        Cursor c = getContentResolver().query(children, cols, null, null, null);
+        JSONObject root = new JSONObject();
+        root.put("uri", tree.toString());
+        root.put("docId", rootDocId);
+        org.json.JSONArray arr = new org.json.JSONArray();
+        String folderName = "";
+        if (c != null) {
+            while (c.moveToNext() && arr.length() < 400) {
+                String did = c.getString(0);
+                String name = c.getString(1);
+                String mime = c.getString(2);
+                long size = c.isNull(3) ? -1 : c.getLong(3);
+                long lm = c.isNull(4) ? 0 : c.getLong(4);
+                boolean dir = "vnd.android.document/directory".equals(mime);
+                if (did.equals(rootDocId) && name != null) folderName = name;
+                JSONObject f = new JSONObject();
+                f.put("name", name == null ? did : name);
+                f.put("docId", did);
+                f.put("mime", mime == null ? "" : mime);
+                f.put("size", size);
+                f.put("lastModified", lm);
+                f.put("dir", dir);
+                arr.put(f);
+            }
+            c.close();
+        }
+        if (folderName.isEmpty()) {
+            try {
+                Uri self = DocumentsContract.buildDocumentUriUsingTree(tree, rootDocId);
+                Cursor sc = getContentResolver().query(self, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null);
+                if (sc != null) {
+                    if (sc.moveToFirst()) folderName = sc.getString(0);
+                    sc.close();
+                }
+            } catch (Exception ignore) {
+            }
+        }
+        root.put("name", folderName);
+        root.put("files", arr);
+        return root.toString();
+    }
+
+    private void emitFolder(String id, String json) {
+        if (id == null) return;
+        final String js = "window.__sisqiFolder&&window.__sisqiFolder(" + JSONObject.quote(id) + "," + json + ")";
+        runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    if (web != null) web.evaluateJavascript(js, null);
+                } catch (Exception ignore) {
+                }
+            }
+        });
+    }
+
+    private void emitDoc(String id, String json) {
+        if (id == null) return;
+        final String js = "window.__sisqiDoc&&window.__sisqiDoc(" + JSONObject.quote(id) + "," + json + ")";
+        runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    if (web != null) web.evaluateJavascript(js, null);
+                } catch (Exception ignore) {
+                }
+            }
+        });
     }
 
     private static boolean isTextLike(String mime) {

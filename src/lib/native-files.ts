@@ -14,11 +14,52 @@ export interface PickedFile {
 
 interface SisqiHostFiles {
   pickFile?: (id: string, mime: string) => void
+  pickFolder?: (id: string) => void
+  listFolder?: (id: string, treeUri: string, docId: string) => void
+  readDoc?: (id: string, treeUri: string, docId: string) => void
+}
+
+export interface ProjectFile {
+  name: string
+  docId: string
+  mime: string
+  size: number
+  lastModified: number
+  dir: boolean
+}
+
+export interface ProjectTree {
+  name: string
+  uri: string
+  docId: string
+  files: ProjectFile[]
 }
 
 declare global {
   interface Window {
     __sisqiFile?: (id: string, file: PickedFile | null) => void
+    __sisqiFolder?: (id: string, tree: ProjectTree | null) => void
+    __sisqiDoc?: (id: string, doc: { text: string; truncated?: boolean } | null) => void
+  }
+}
+
+type FolderWaiter = (tree: ProjectTree | null) => void
+type DocWaiter = (doc: { text: string; truncated?: boolean } | null) => void
+const folderWaiters = new Map<string, FolderWaiter>()
+const docWaiters = new Map<string, DocWaiter>()
+
+if (typeof window !== 'undefined') {
+  window.__sisqiFolder = (id, tree) => {
+    const cb = folderWaiters.get(id)
+    if (!cb) return
+    folderWaiters.delete(id)
+    cb(tree)
+  }
+  window.__sisqiDoc = (id, doc) => {
+    const cb = docWaiters.get(id)
+    if (!cb) return
+    docWaiters.delete(id)
+    cb(doc)
   }
 }
 
@@ -76,4 +117,52 @@ function pickWithInput(mime: string): Promise<PickedFile | null> {
     }
     input.click()
   })
+}
+export function nativeFolderAvailable(): boolean {
+  return typeof window !== 'undefined' && typeof window.SisqiHost?.pickFolder === 'function'
+}
+
+/** 选择项目文件夹（系统目录选择器，得到持久化读权限） */
+export function pickFolder(): Promise<ProjectTree | null> {
+  const host = window.SisqiHost
+  if (!host?.pickFolder) return Promise.resolve(null)
+  const id = `d${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    folderWaiters.set(id, resolve)
+    host.pickFolder!(id)
+  })
+}
+
+/** 列目录（docId 为空表示根） */
+export function listFolder(treeUri: string, docId = ''): Promise<ProjectTree | null> {
+  const host = window.SisqiHost
+  if (!host?.listFolder) return Promise.resolve(null)
+  const id = `l${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    folderWaiters.set(id, resolve)
+    host.listFolder!(id, treeUri, docId)
+  })
+}
+
+/** 读取文本文件（上限 256KB） */
+export function readDoc(treeUri: string, docId: string): Promise<{ text: string; truncated?: boolean } | null> {
+  const host = window.SisqiHost
+  if (!host?.readDoc) return Promise.resolve(null)
+  const id = `r${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    docWaiters.set(id, resolve)
+    host.readDoc!(id, treeUri, docId)
+  })
+}
+
+export const isTextMime = (mime: string, name: string) =>
+  mime.startsWith('text/') ||
+  /json|xml|javascript|yaml|x-sh|markdown/.test(mime) ||
+  /\.(md|txt|json|ya?ml|ts|tsx|js|jsx|css|html|kt|java|py|go|rs|sh|toml|ini|log|csv)$/i.test(name)
+
+export function formatBytes(n: number): string {
+  if (n < 0) return '—'
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }

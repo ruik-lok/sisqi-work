@@ -16,6 +16,9 @@ interface NativeHost {
   deleteSecret?: (id: string) => void
   deviceInfo?: () => string
   pickFile?: (id: string, mime: string) => void
+  pickFolder?: (id: string) => void
+  listFolder?: (id: string, treeUri: string, docId: string) => void
+  readDoc?: (id: string, treeUri: string, docId: string) => void
 }
 
 declare global {
