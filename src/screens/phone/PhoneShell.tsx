@@ -560,8 +560,9 @@ function PhoneProjects() {
                 已跟踪 {gitStatus.tracked} 个文件
                 {gitStatus.status.modified > 0 && <span className="text-[var(--warn)]"> · {gitStatus.status.modified} 个修改</span>}
                 {gitStatus.status.deleted > 0 && <span className="text-[var(--danger)]"> · {gitStatus.status.deleted} 个删除</span>}
+                {gitStatus.status.untracked > 0 && <span className="text-[var(--info)]"> · {gitStatus.status.untracked} 个未跟踪</span>}
                 {gitStatus.status.scannedDirs < gitStatus.status.totalDirs && `（扫描 ${gitStatus.status.scannedDirs}/${gitStatus.status.totalDirs} 个目录）`}
-                {gitStatus.status.modified === 0 && gitStatus.status.deleted === 0 && ' · 工作区干净'}
+                {gitStatus.status.modified === 0 && gitStatus.status.deleted === 0 && gitStatus.status.untracked === 0 && ' · 工作区干净'}
               </p>
             )}
             {git.commits.length > 0 && (

@@ -47,9 +47,16 @@ export function parseGitIndex(bytes: Uint8Array): GitIndex | null {
 export interface GitStatus {
   modified: number
   deleted: number
+  /** 未跟踪文件（只在扫描到的目录里统计） */
+  untracked: number
   scannedDirs: number
   totalDirs: number
 }
+
+/** 这些目录不参与未跟踪统计（第三方依赖/构建产物） */
+export const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', '.gradle', '.idea', '__pycache__', '.venv', 'vendor'])
+
+export const isIgnoredDir = (name: string) => IGNORED_DIRS.has(name)
 
 /** 只比对 index 里出现过的目录；最多扫 maxDirs 个，避免逐层遍历整棵树 */
 export async function scanWorktree(treeUri: string, entries: GitIndexEntry[], maxDirs = 10): Promise<GitStatus> {
@@ -65,12 +72,14 @@ export async function scanWorktree(treeUri: string, entries: GitIndexEntry[], ma
 
   let modified = 0
   let deleted = 0
+  let untracked = 0
   let scannedDirs = 0
   for (const dir of dirs) {
     const tree = await listTreePath(treeUri, dir)
     if (!tree) continue
     scannedDirs += 1
     const files = new Map(tree.files.map((f) => [f.name, f]))
+    const tracked = new Set((byDir.get(dir) ?? []).map((e) => e.path.slice(dir ? dir.length + 1 : 0)))
     for (const entry of byDir.get(dir) ?? []) {
       const name = entry.path.slice(dir ? dir.length + 1 : 0)
       const f = files.get(name)
@@ -82,8 +91,12 @@ export async function scanWorktree(treeUri: string, entries: GitIndexEntry[], ma
       const timeChanged = f.lastModified > 0 && Math.abs(Math.floor(f.lastModified / 1000) - entry.mtime) > 2
       if (sizeChanged || timeChanged) modified += 1
     }
+    for (const f of tree.files) {
+      if (f.dir || isIgnoredDir(f.name)) continue
+      if (!tracked.has(f.name)) untracked += 1
+    }
   }
-  return { modified, deleted, scannedDirs, totalDirs: byDir.size }
+  return { modified, deleted, untracked, scannedDirs, totalDirs: byDir.size }
 }
 
 export async function readGitStatus(treeUri: string): Promise<{ tracked: number; status: GitStatus } | null> {
