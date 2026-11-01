@@ -318,8 +318,8 @@ public class HudService extends Service {
             ui.post(new Runnable() {
                 public void run() {
                     if (ripple != null) ripple.addTap(x, y);
-                    if (label != null) sendStatus(label);
-                    else sendStatus("点击 (" + (int) x + ", " + (int) y + ")");
+                    // 文字给「人看的」，坐标只用来画涟漪
+                    sendStatus(label != null && !label.isEmpty() ? label : "点击");
                 }
             });
         } else if ("swipe".equals(type)) {
@@ -328,7 +328,7 @@ public class HudService extends Service {
             ui.post(new Runnable() {
                 public void run() {
                     if (ripple != null) ripple.addSwipe(x1, y1, x2, y2);
-                    sendStatus(label != null ? label : "滑动 (" + (int) x1 + "," + (int) y1 + ") → (" + (int) x2 + "," + (int) y2 + ")");
+                    sendStatus(label != null && !label.isEmpty() ? label : "滑动");
                 }
             });
         } else if ("status".equals(type)) {
