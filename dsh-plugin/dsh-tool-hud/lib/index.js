@@ -44,6 +44,10 @@ const outSchema = {
   }
 };
 
+/** 工具结果展示：成功就说一句，失败带上原因 */
+const render = (args, v) =>
+  v && v.ok ? "已更新流体云" : "流体云更新失败：" + ((v && v.error) || "HUD 应用没在运行");
+
 function apply(ctx) {
   ctx.tools.register(defineTool({
     name: "hud_status",
@@ -53,7 +57,7 @@ function apply(ctx) {
     parameters: {
       text: { type: "string", description: "给人看的一句话，例如「正在打开设置」" }
     },
-    output: { schema: outSchema },
+    output: { schema: outSchema, render },
     async execute(args) {
       return hud({ type: "status", text: args.text || "DSH 操作中" });
     }
@@ -65,7 +69,7 @@ function apply(ctx) {
     parameters: {
       text: { type: "string", description: "完成提示，例如「完成 · 用时 12s」" }
     },
-    output: { schema: outSchema },
+    output: { schema: outSchema, render },
     async execute(args) {
       return hud({ type: "done", text: args.text || "任务完成" });
     }
@@ -75,7 +79,7 @@ function apply(ctx) {
     name: "hud_hide",
     description: "立即收起流体云。",
     parameters: {},
-    output: { schema: outSchema },
+    output: { schema: outSchema, render },
     async execute() {
       return hud({ type: "hide" });
     }
