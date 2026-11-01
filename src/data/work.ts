@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 思祁.Work · v2.0 领域数据
  * 会话 / 模型 Provider / 模型 / 连接器 / 技能 / 用量
  * 数值与状态为原型演示数据，不代表真实账单或真机结论。
@@ -145,7 +145,7 @@ export const providers: Provider[] = [
     keyMasked: 'sk-••••••••••••b90e',
     enabled: true,
     status: 'unverified',
-    models: ['deepseek-reasoner'],
+    models: ['deepseek-chat', 'deepseek-reasoner'],
     lastTest: null,
     latencyMs: null,
     route: 'direct',
@@ -169,6 +169,7 @@ export const models: ModelInfo[] = [
   { id: 'm_gpt52', name: 'gpt-5.2', providerId: 'p_openai', contextK: 400, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具', '结构化', '推理'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
   { id: 'm_gpt52mini', name: 'gpt-5.2-mini', providerId: 'p_openai', contextK: 200, priceIn: 0.25, priceOut: 2, capabilities: ['文本', '工具', '结构化'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_ds', name: 'deepseek-reasoner', providerId: 'p_deepseek', contextK: 128, priceIn: 0.55, priceOut: 2.19, capabilities: ['文本', '推理'], enabled: true, capabilitySource: '实测' },
+  { id: 'm_ds_chat', name: 'deepseek-chat', providerId: 'p_deepseek', contextK: 128, priceIn: 0.27, priceOut: 1.1, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_qwen', name: 'qwen3-coder', providerId: 'p_custom', contextK: 256, priceIn: 0.3, priceOut: 1.2, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '实测' },
 ]
 

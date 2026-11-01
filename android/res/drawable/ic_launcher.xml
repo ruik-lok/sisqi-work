@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 思祁.Work 启动图标：深色底 + 青色笔势（与 favicon 同源，vector 免多分辨率） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#0A0D12"
+        android:pathData="M0,0h24v24h-24z" />
+    <path
+        android:pathData="M12,2.6 L20.4,7.3 L20.4,16.7 L12,21.4 L3.6,16.7 L3.6,7.3 Z"
+        android:strokeColor="#58C7E0"
+        android:strokeWidth="0.9"
+        android:strokeAlpha="0.5"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M7.4,15.6 L7.4,8.4 L16.6,15.6 L16.6,8.4"
+        android:strokeColor="#58C7E0"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:fillColor="#58C7E0"
+        android:pathData="M12,10.8 a1.2,1.2 0 1,0 0.001,0 z" />
+</vector>

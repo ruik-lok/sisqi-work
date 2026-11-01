@@ -20,6 +20,7 @@ import { Wordmark } from '../../components/brand/Mark'
 import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../components/chat/Chat'
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
+import { PhoneModels } from './PhoneModels'
 import { connectors, models, usage } from '../../data/work'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
@@ -188,6 +189,8 @@ export function PhoneShell({
                 <span className="ml-auto font-mono text-[12px] text-[var(--fg)]">{models[0].name}</span>
               </div>
             </section>
+
+            <PhoneModels />
 
             <section className="mt-2 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
               <div className="flex items-center gap-2">

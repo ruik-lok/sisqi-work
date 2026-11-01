@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Check,
   CloudDownload,
@@ -24,7 +24,7 @@ import { Dialog } from '../../components/ui/overlays'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel } from '../../lib/labels'
-import { isDesktop, isEncryptedStore } from '../../lib/secrets'
+import { isDesktop, isEncryptedStore, isNativeShell, runtimeLabel, secretStorageLabel } from '../../lib/secrets'
 
 type Section = 'appearance' | 'models' | 'devices' | 'security' | 'backup' | 'about'
 
@@ -193,7 +193,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
           )
         })}
         <p className="mt-4 px-4 text-[11px] leading-relaxed text-[var(--faint)]">
-          {isDesktop() ? '桌面版：密钥用系统加密存储' : '浏览器预览：密钥只存在本机'}
+          {isDesktop() ? '桌面版：密钥用系统加密存储' : isNativeShell() ? 'APK：密钥用 Android Keystore 加密' : '浏览器预览：密钥只存在本机'}
         </p>
       </aside>
 
@@ -438,7 +438,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
                 <Panel className="p-4">
                   <p className="text-[15px] font-semibold text-[var(--fg)]">连接与安全</p>
                   <ul className="mt-1.5 space-y-1 text-[12px] leading-relaxed text-[var(--muted)]">
-                    <li>· 密钥保存位置：{isEncryptedStore() ? '系统加密存储（Electron safeStorage）' : '本机 localStorage（浏览器预览）'}。</li>
+                    <li>· 密钥保存位置：{secretStorageLabel()}。</li>
                     <li>· 界面只显示前 4 位与后 4 位，日志与错误信息不含密钥。</li>
                     <li>· 请求由本机直接发往你填写的 Base URL，不经过中转服务。</li>
                     <li>· 仅支持 OpenAI 兼容的 <span className="font-mono">/chat/completions</span> 流式协议。</li>
@@ -557,7 +557,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
                 {[
                   ['应用版本', '2.1.0 (prototype)'],
                   ['规范基线', 'v2.0 · 2026-11'],
-                  ['运行环境', isDesktop() ? 'Windows 桌面版（Electron）' : '浏览器预览'],
+                  ['运行环境', runtimeLabel()],
                   ['界面模式', density === 'pro' ? 'Pro' : 'Lite'],
                   ['主题', theme === 'system' ? '跟随系统' : theme === 'light' ? 'Arctic Blue' : 'Midnight Blue'],
                   ['对话协议', 'OpenAI 兼容 /chat/completions（SSE）'],
@@ -637,7 +637,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
         open={Boolean(keyEditor)}
         onClose={() => setKeyEditor(null)}
         title="设置 API Key"
-        description={isEncryptedStore() ? '使用系统加密存储；界面只显示掩码。' : '浏览器预览下保存在本机 localStorage；桌面版会用系统加密存储。'}
+        description={isEncryptedStore() ? `${secretStorageLabel()}；界面只显示掩码。` : '浏览器预览下保存在本机 localStorage；桌面版与 APK 会用系统加密存储。'}
         width="max-w-[520px]"
         footer={
           <>

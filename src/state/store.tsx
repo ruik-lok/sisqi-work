@@ -121,7 +121,7 @@ interface Store {
   removeProvider: (id: string) => void
   setProviderKey: (id: string, key: string) => Promise<void>
   clearProviderKey: (id: string) => Promise<void>
-  testProvider: (id: string) => Promise<void>
+  testProvider: (id: string, override?: { baseUrl?: string; key?: string }) => Promise<void>
   toggleProvider: (id: string) => void
   addModel: (input: Omit<ModelInfo, 'id'>) => void
   updateModel: (id: string, patch: Partial<ModelInfo>) => void
@@ -219,7 +219,12 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     if (fromUrl && seedModels.some((m) => m.id === fromUrl)) return fromUrl
     return initial.modelId ?? seedModels.find((m) => m.isDefault)?.id ?? seedModels[0].id
   })
-  const [modelList, setModelList] = useState<ModelInfo[]>(() => initial.models?.length ? initial.models : seedModels)
+  const [modelList, setModelList] = useState<ModelInfo[]>(() => {
+    // 本地已保存的模型 + 新版本内置模型（按 id 去重），避免升级后看不到新加的模型
+    const merged = initial.models?.length ? [...initial.models] : []
+    for (const m of seedModels) if (!merged.some((x) => x.id === m.id)) merged.push(m)
+    return merged.length ? merged : seedModels
+  })
   const [providers, setProviders] = useState<Provider[]>(() => {
     const base = initial.providers?.length ? initial.providers : seedProviders.map(({ keyMasked: _k, ...rest }) => rest)
     return base.map((p) => ({ ...p, keyMasked: '未配置', status: 'unverified', latencyMs: null, lastTest: null }))
@@ -430,6 +435,8 @@ export function NexusProvider({ children }: { children: ReactNode }) {
 
       const llmMessages: LlmMessage[] = history
         .filter((m) => m.role === 'user' || m.role === 'assistant')
+        // 演示模式的助手消息是本地脚本写的，会带偏真模型（它会模仿成"演示模式"），不送进上下文
+        .filter((m) => m.mode !== 'demo')
         .filter((m) => m.content.trim().length > 0)
         .slice(-20)
         .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
@@ -586,17 +593,19 @@ export function NexusProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const testProvider = useCallback(
-    async (id: string) => {
+    async (id: string, override?: { baseUrl?: string; key?: string }) => {
       const provider = providers.find((p) => p.id === id)
       if (!provider) return
-      const key = keysRef.current[id]
+      // 允许传入刚在弹窗里改过的 Base URL / Key，避免测试跑到上一次保存的配置
+      const key = override?.key?.trim() || keysRef.current[id]
+      const baseUrl = override?.baseUrl?.trim() || provider.baseUrl
       if (!key) {
         toast({ title: '还没有配置密钥', detail: '先填写 API Key，再做连接测试。', tone: 'warn' })
         return
       }
       setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'unverified', latencyMs: null } : p)))
       try {
-        const res = await probeProvider(provider.baseUrl, key)
+        const res = await probeProvider(baseUrl, key)
         setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'connected', latencyMs: res.latencyMs, lastTest: `今天 ${clock()}` } : p)))
         toast({ title: '连接成功', detail: `${res.models.length} 个模型 · ${res.latencyMs}ms`, tone: 'ok' })
         if (res.models.length) {
