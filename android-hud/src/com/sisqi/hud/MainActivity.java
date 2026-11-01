@@ -4,19 +4,17 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** DSH HUD 控制页：授权悬浮窗、启动/停止 HUD、显示接口地址。 */
+/** DSH HUD 控制页：启动/停止流体云服务，查看状态与接口。 */
 public class MainActivity extends Activity {
     private TextView status;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -30,7 +28,7 @@ public class MainActivity extends Activity {
         root.setPadding(dp(24), dp(48), dp(24), dp(24));
         root.setBackgroundColor(Color.parseColor("#F6F7FB"));
 
-        android.widget.ImageView logo = new android.widget.ImageView(this);
+        ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.ic_launcher);
         LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(64), dp(64));
         logoLp.bottomMargin = dp(12);
@@ -48,18 +46,8 @@ public class MainActivity extends Activity {
         status.setPadding(0, dp(12), 0, dp(20));
         root.addView(status);
 
-        Button perm = new Button(this);
-        perm.setText("① 授予悬浮窗权限");
-        perm.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
-                startActivity(i);
-            }
-        });
-        root.addView(perm);
-
         Button start = new Button(this);
-        start.setText("② 启动 HUD");
+        start.setText("启动流体云");
         start.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Intent i = new Intent(MainActivity.this, HudService.class);
@@ -70,7 +58,7 @@ public class MainActivity extends Activity {
         root.addView(start);
 
         Button stop = new Button(this);
-        stop.setText("停止 HUD");
+        stop.setText("停止");
         stop.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 stopService(new Intent(MainActivity.this, HudService.class));
@@ -84,11 +72,12 @@ public class MainActivity extends Activity {
         hint.setTextColor(Color.parseColor("#8A90A2"));
         hint.setPadding(0, dp(24), 0, 0);
         hint.setText("接口（本机回环）：\n" +
-                "GET http://127.0.0.1:8765/act?type=tap&x=540&y=1200\n" +
-                "GET /act?type=swipe&x1=100&y1=900&x2=900&y2=900\n" +
                 "GET /act?type=status&text=正在打开设置\n" +
-                "GET /act?type=done&text=任务完成\n" +
-                "GET /act?type=hide");
+                "GET /act?type=tap&text=点击「WLAN」\n" +
+                "GET /act?type=swipe&text=滑动列表\n" +
+                "GET /act?type=done&text=完成 · 已打开 WLAN\n" +
+                "GET /act?type=hide\n\n" +
+                "（地址 http://127.0.0.1:8765）");
         root.addView(hint);
 
         setContentView(root);
@@ -105,11 +94,9 @@ public class MainActivity extends Activity {
     }
 
     private void refresh() {
-        boolean overlay = Settings.canDrawOverlays(this);
-        boolean running = HudService.isRunning;
-        status.setText((overlay ? "悬浮窗权限：已授予" : "悬浮窗权限：未授予") + "\n" +
-                "HUD 服务：" + (running ? "运行中 · 端口 8765" : "已停止") + "\n" +
-                "流体云（实时通知）：" + HudService.promotedState(this));
+        status.setText("HUD 服务：" + (HudService.isRunning ? "运行中 · 端口 8765" : "已停止") + "\n" +
+                "流体云（实时通知）：" + HudService.promotedState(this) + "\n" +
+                "悬浮窗：已移除（只走流体云）");
     }
 
     private int dp(int v) {

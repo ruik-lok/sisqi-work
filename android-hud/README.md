@@ -1,25 +1,30 @@
-# DSH HUD（悬浮操作指示器）
+# DSH HUD（流体云版）
 
-独立小应用：给 DSH 操作手机时提供实时可视化。
+只做一件事：把 DSH 的操作状态显示在状态栏的**流体云**里（Android 16 实时更新通知，ColorOS 渲染）。
 
-- 顶部胶囊：显示「DSH 操作中 · 点击 (540,1200)」「滑动 …」；**按住可拖动**，位置会记住
-- 点击处：涟漪 + 白色十字准心（650ms 消散）
-- 滑动：蓝色轨迹（800ms 消散）
-- 结束：胶囊变绿「完成」+ 系统通知
+**没有悬浮窗**：不画任何覆盖在屏幕上的东西。
 
-绘制层和胶囊是两个窗口：绘制层全屏但不接收触摸，胶囊只是一个小窗口，所以不会挡住 App 的点击。
+## 接口（本机回环 127.0.0.1:8765）
 
-## 接口（本机回环）
+    GET /act?type=status&text=正在打开设置
+    GET /act?type=tap&text=点击「WLAN」
+    GET /act?type=swipe&text=滑动列表
+    GET /act?type=done&text=完成 · 已打开 WLAN
+    GET /act?type=hide
 
-    GET http://127.0.0.1:8765/act?type=status&text=正在打开设置
-    GET http://127.0.0.1:8765/act?type=tap&x=540&y=1200
-    GET http://127.0.0.1:8765/act?type=swipe&x1=200&y1=900&x2=800&y2=900
-    GET http://127.0.0.1:8765/act?type=done&text=任务完成 · 用时 12s
-    GET http://127.0.0.1:8765/act?type=hide
+- 文字是给人看的（不要传坐标）
+- 合并推送：最多 ~900ms 一次
+- 心跳：有活动时每 20s 续期，30s 无事件自动收起
 
-## 构建与安装
+## 构建安装
 
     ANDROID_JAR=/path/android.jar bash build.sh
     pm install -r -t build/hud.apk
-    appops set com.sisqi.hud SYSTEM_ALERT_WINDOW allow
+    appops set com.sisqi.hud POST_PROMOTED_NOTIFICATIONS allow
     am start-foreground-service -n com.sisqi.hud/.HudService
+
+## 图标
+
+鲸鱼取自已安装的 DSH（com.deepseek.harness）的 `res/drawable/ic_launcher.xml` 矢量路径：
+- 应用图标：浅底 #F7F8FC + 黑色鲸鱼 #0B0C0F
+- 通知/流体云：透明底 + 白色鲸鱼（单色）
