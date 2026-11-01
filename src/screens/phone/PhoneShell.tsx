@@ -25,6 +25,7 @@ import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../compon
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { PhoneModels } from './PhoneModels'
+import { GithubConnector } from './GithubConnector'
 import { connectors, skills } from '../../data/work'
 import { modelLabel } from '../../lib/labels'
 import { deviceInfo, ramGb } from '../../lib/native-device'
@@ -158,7 +159,8 @@ export function PhoneShell({
             </button>
 
             <div className="mt-2 space-y-2">
-              {connectors.slice(0, 6).map((c) => (
+              <GithubConnector />
+              {connectors.filter((c) => c.id !== 'c_github').slice(0, 5).map((c) => (
                 <div key={c.id} className="flex items-center gap-2.5 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
                   <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] text-[var(--muted)]">
                     <Plug size={15} />
