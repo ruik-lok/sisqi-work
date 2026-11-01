@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Github, Lock, RefreshCw, Unplug } from 'lucide-react'
-import { Button, StatusPill } from '../../components/ui/primitives'
+import { ArrowLeft, ChevronRight, Github, Lock, RefreshCw, Star, Unplug } from 'lucide-react'
+import { Button, IconButton, StatusPill } from '../../components/ui/primitives'
+import { MarkdownText } from '../../components/chat/Markdown'
 import { BottomSheet } from '../../components/ui/overlays'
 import { useNexus } from '../../state/store'
 import { secretStore } from '../../lib/secrets'
-import { GithubError, fetchGithubRepos, fetchGithubUser, relativeDate, type GithubRepo, type GithubUser } from '../../lib/github'
+import {
+  GithubError,
+  fetchGithubRepos,
+  fetchGithubUser,
+  fetchRepoDetail,
+  relativeDate,
+  type GithubRepo,
+  type GithubRepoDetail,
+  type GithubUser,
+} from '../../lib/github'
 
 const TOKEN_ID = 'github'
 
@@ -18,6 +28,8 @@ export function GithubConnector() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
+  const [detail, setDetail] = useState<GithubRepoDetail | null>(null)
+  const [detailBusy, setDetailBusy] = useState(false)
 
   const load = async (tk: string) => {
     setBusy(true)
@@ -70,6 +82,19 @@ export function GithubConnector() {
       setError(e instanceof GithubError ? e.message : '连接失败')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const openRepo = async (repo: GithubRepo) => {
+    if (!token) return
+    setDetailBusy(true)
+    setDetail(null)
+    try {
+      setDetail(await fetchRepoDetail(token, repo.fullName))
+    } catch (e) {
+      toast({ title: '读取仓库失败', detail: e instanceof GithubError ? e.message : '未知错误', tone: 'danger' })
+    } finally {
+      setDetailBusy(false)
     }
   }
 
@@ -126,6 +151,43 @@ export function GithubConnector() {
               </Button>
               <p className="mt-2 text-[11px] leading-relaxed text-[var(--faint)]">建议最小权限：只勾选仓库读取（需要私有仓库时再勾选对应仓库）。</p>
             </>
+          ) : detail || detailBusy ? (
+            <>
+              <div className="flex items-center gap-2">
+                <IconButton label="返回仓库列表" size="sm" onClick={() => { setDetail(null); setDetailBusy(false) }}>
+                  <ArrowLeft size={14} />
+                </IconButton>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-[12.5px] text-[var(--fg)]">{detail?.fullName ?? '读取中…'}</p>
+                  {detail && (
+                    <p className="text-[10.5px] text-[var(--faint)]">
+                      {detail.language ?? '—'} · <Star size={9} className="inline align-[-1px]" /> {detail.stars} · {detail.branch}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {detailBusy && <p className="mt-3 text-[12px] text-[var(--faint)]">正在读取仓库…</p>}
+              {detail && (
+                <>
+                  {detail.description && <p className="mt-2 text-[12px] leading-relaxed text-[var(--muted)]">{detail.description}</p>}
+                  <p className="label mt-4">最近提交</p>
+                  <div className="mt-1.5 space-y-1">
+                    {detail.commits.map((c) => (
+                      <div key={c.sha} className="flex items-baseline gap-2">
+                        <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
+                        <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--fg)]">{c.message}</span>
+                        <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{relativeDate(c.date)}</span>
+                      </div>
+                    ))}
+                    {!detail.commits.length && <p className="text-[12px] text-[var(--faint)]">没有读到提交（空仓库或权限不足）</p>}
+                  </div>
+                  <p className="label mt-4">README</p>
+                  <div className="mt-1.5 max-h-[300px] overflow-y-auto rounded-[14px] bg-[var(--surface-2)] p-3 text-[12.5px] leading-relaxed">
+                    {detail.readme ? <MarkdownText text={detail.readme} /> : <p className="text-[12px] text-[var(--faint)]">没有 README</p>}
+                  </div>
+                </>
+              )}
+            </>
           ) : (
             <>
               <div className="flex items-center gap-2.5">
@@ -144,7 +206,11 @@ export function GithubConnector() {
               <p className="label mt-4">最近更新</p>
               <div className="mt-1.5 space-y-1.5">
                 {repos.map((r) => (
-                  <div key={r.id} className="flex items-center gap-2 rounded-[12px] bg-[var(--surface-2)] px-2.5 py-2">
+                  <button
+                    key={r.id}
+                    onClick={() => void openRepo(r)}
+                    className="flex w-full items-center gap-2 rounded-[12px] bg-[var(--surface-2)] px-2.5 py-2 text-left"
+                  >
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1 truncate font-mono text-[12px] text-[var(--fg)]">
                         {r.private && <Lock size={10} className="shrink-0 text-[var(--faint)]" />}
@@ -154,7 +220,8 @@ export function GithubConnector() {
                         {r.language ?? '—'} · {r.branch} · {relativeDate(r.updatedAt)}
                       </span>
                     </span>
-                  </div>
+                    <ChevronRight size={14} className="shrink-0 text-[var(--faint)]" />
+                  </button>
                 ))}
                 {!repos.length && !busy && <p className="text-[12px] text-[var(--faint)]">没有可读仓库（令牌可能没有仓库权限）。</p>}
               </div>

@@ -94,3 +94,76 @@ export const relativeDate = (iso: string) => {
   if (day < 30) return `${day} 天前`
   return new Date(iso).toLocaleDateString('zh-CN')
 }
+export interface GithubCommit {
+  sha: string
+  message: string
+  author?: string
+  date: string
+}
+
+export interface GithubRepoDetail {
+  fullName: string
+  description?: string
+  private: boolean
+  stars: number
+  language?: string
+  branch: string
+  updatedAt: string
+  readme?: string
+  commits: GithubCommit[]
+}
+
+/** 单个仓库详情：基本信息 + README + 最近提交 */
+export async function fetchRepoDetail(token: string, fullName: string): Promise<GithubRepoDetail> {
+  const repo = (await ghGet(`/repos/${fullName}`, token)) as {
+    full_name?: string
+    description?: string | null
+    private?: boolean
+    stargazers_count?: number
+    language?: string | null
+    default_branch?: string
+    updated_at?: string
+  }
+  if (!repo.full_name) throw new GithubError('仓库不存在或没有权限')
+
+  let readme: string | undefined
+  try {
+    const doc = (await ghGet(`/repos/${fullName}/readme`, token)) as { content?: string; encoding?: string }
+    if (doc.content) {
+      const bin = atob(doc.content.replace(/\s/g, ''))
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      readme = new TextDecoder().decode(bytes).slice(0, 12000)
+    }
+  } catch {
+    /* 没有 README 不算错误 */
+  }
+
+  let commits: GithubCommit[] = []
+  try {
+    const list = (await ghGet(`/repos/${fullName}/commits?per_page=5`, token)) as Array<{
+      sha: string
+      commit?: { message?: string; author?: { name?: string; date?: string } }
+    }>
+    commits = list.slice(0, 5).map((c) => ({
+      sha: c.sha.slice(0, 7),
+      message: (c.commit?.message ?? '').split('\n')[0],
+      author: c.commit?.author?.name,
+      date: c.commit?.author?.date ?? '',
+    }))
+  } catch {
+    /* 空仓库或权限不足 */
+  }
+
+  return {
+    fullName: repo.full_name,
+    description: repo.description ?? undefined,
+    private: Boolean(repo.private),
+    stars: repo.stargazers_count ?? 0,
+    language: repo.language ?? undefined,
+    branch: repo.default_branch ?? 'main',
+    updatedAt: repo.updated_at ?? '',
+    readme,
+    commits,
+  }
+}
