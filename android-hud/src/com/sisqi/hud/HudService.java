@@ -48,6 +48,11 @@ public class HudService extends Service {
     private WindowManager.LayoutParams pillParams;
     private int pillX = 24;
     private int pillY = 180;
+    private NotificationManager nm;
+    private long lastPromoteAt = 0;
+    private String pendingPromote;
+    private boolean promoteScheduled = false;
+    private String lastTitle = "DSH 操作中";
     private final Handler ui = new Handler(Looper.getMainLooper());
     private ServerSocket server;
     private volatile boolean running = false;
@@ -61,7 +66,9 @@ public class HudService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         startForeground(1, buildNotification("DSH HUD 运行中", "监听 127.0.0.1:" + PORT));
+        promote("就绪");
         showOverlay();
         startServer();
         isRunning = true;
@@ -125,7 +132,9 @@ public class HudService extends Service {
         // 2) 胶囊：独立小窗口，可拖动，不遮挡点击以外区域
         android.content.SharedPreferences sp = getSharedPreferences("hud", MODE_PRIVATE);
         pillX = sp.getInt("x", 24);
-        pillY = sp.getInt("y", 180);
+        pillY = sp.getInt("y", 300);
+        // 状态栏那一条留给系统的流体云，旧位置（<240）自动下移
+        if (pillY < 240) pillY = 300;
 
         pill = new TextView(this);
         pill.setTextColor(Color.WHITE);
@@ -200,6 +209,7 @@ public class HudService extends Service {
                 pill.setText(text);
                 pill.setTextColor(Color.WHITE);
                 pill.setAlpha(1f);
+                promote(text);
             }
         });
     }
@@ -218,8 +228,7 @@ public class HudService extends Service {
                 }, 2500);
             }
         });
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        nm.notify(2, buildNotification("DSH 任务完成", text));
+        promote(text);
     }
 
     private void hidePill() {
@@ -334,6 +343,72 @@ public class HudService extends Service {
     }
 
     /* ------------------------------------------------------ notification */
+
+
+    /* --------------------------------------------- 流体云（实时更新通知） */
+
+    private void promote(final String text) {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastPromoteAt < 350) {
+            pendingPromote = text;
+            if (!promoteScheduled) {
+                promoteScheduled = true;
+                ui.postDelayed(new Runnable() {
+                    public void run() {
+                        promoteScheduled = false;
+                        String t = pendingPromote;
+                        pendingPromote = null;
+                        if (t != null) promoteNow(t);
+                    }
+                }, 360);
+            }
+            return;
+        }
+        promoteNow(text);
+    }
+
+    private void promoteNow(String text) {
+        lastPromoteAt = android.os.SystemClock.uptimeMillis();
+        try {
+            nm.notify(3, buildPromoted(text));
+        } catch (Throwable e) {
+            Log.w("HUD", "promote failed: " + e);
+        }
+    }
+
+    private Notification buildPromoted(String text) {
+        Intent open = new Intent(this, MainActivity.class);
+        PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
+        b.setContentTitle(text)
+                .setContentText("DSH · 正在操作这台手机")
+                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(pi)
+                .setCategory(Notification.CATEGORY_PROGRESS);
+        // Android 16：胶囊短文字 + 请求升级为「实时更新 / 流体云」。低版本没有这些方法，用反射跳过。
+        try {
+            Notification.Builder.class.getMethod("setShortCriticalText", CharSequence.class).invoke(b, "DSH");
+        } catch (Throwable ignore) {
+        }
+        try {
+            Notification.Builder.class.getMethod("setRequestPromotedOngoing", boolean.class).invoke(b, true);
+        } catch (Throwable ignore) {
+        }
+        return b.build();
+    }
+
+    /** 系统是否允许本应用发布提升通知（API 36 才有） */
+    static String promotedState(android.content.Context ctx) {
+        try {
+            NotificationManager m = (NotificationManager) ctx.getSystemService(NOTIFICATION_SERVICE);
+            Object v = NotificationManager.class.getMethod("canPostPromotedNotifications").invoke(m);
+            return String.valueOf(v);
+        } catch (Throwable e) {
+            return "不可用（" + e.getClass().getSimpleName() + "）";
+        }
+    }
 
     private Notification buildNotification(String title, String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);

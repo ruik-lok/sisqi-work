@@ -102,7 +102,8 @@ public class MainActivity extends Activity {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean running = HudService.isRunning;
         status.setText((overlay ? "悬浮窗权限：已授予" : "悬浮窗权限：未授予") + "\n" +
-                "HUD 服务：" + (running ? "运行中 · 端口 8765" : "已停止"));
+                "HUD 服务：" + (running ? "运行中 · 端口 8765" : "已停止") + "\n" +
+                "流体云（实时通知）：" + HudService.promotedState(this));
     }
 
     private int dp(int v) {
