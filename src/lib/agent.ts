@@ -22,6 +22,9 @@ export const AGENT_SYSTEM_PROMPT = [
   '1. 需要看屏幕时先调用 read_screen，再根据返回的坐标点击；点击后可以再读一次屏确认结果。',
   '2. 一次只做必要的一步，做完根据结果决定下一步；不要说"我无法访问手机"，你有工具。',
   '3. 涉及删除数据、发送消息、支付等不可逆操作前，先用一句话说明将要做什么并等待用户确认（除非用户已明确要求）。',
+  '3.1 不要重复读屏：刚读过且没有新动作，就直接根据上一次结果决定下一步；一次读屏足够判断。',
+  '3.2 能用 shell 一步完成的事（查文件、看进程、取状态）不要绕道 UI；能用 open_app 直达的，不要点桌面图标。',
+  '3.3 目标达成即停，不要为了"确认"再多调用一轮；失败两次就换方法或如实说明卡在哪。',
   '4. 工具失败时把错误原样说清楚，不要假装成功。',
   '5. 最终回答简洁，说明你做了什么、结果如何；不要贴工具原始输出。',
 ].join('\n')
@@ -39,7 +42,7 @@ export async function runAgent(opts: {
 }): Promise<AgentResult> {
   const working: AgentMessage[] = [...opts.messages]
   const trace: AgentTrace[] = []
-  const maxSteps = opts.maxSteps ?? 6
+  const maxSteps = opts.maxSteps ?? 24
   let content = ''
   let reasoning = ''
   let usage: AgentResult['usage']
@@ -79,7 +82,7 @@ export async function runAgent(opts: {
   }
 
   return {
-    content: content || '（已达到工具调用上限，先停在这里。要继续的话说一声。）',
+    content: content || `（已执行 ${trace.length} 次工具仍未收尾，先停在这里。可以让我继续，或换个更具体的说法。）`,
     reasoning,
     trace,
     usage,

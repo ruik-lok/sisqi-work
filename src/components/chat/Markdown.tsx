@@ -118,7 +118,7 @@ export function inlineNodes(text: string, prefix = 'i'): ReactNode[] {
       )
     } else if (token.startsWith('`')) {
       out.push(
-        <code key={key} className="rounded-[6px] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[0.92em] text-[var(--fg)]">
+        <code key={key} className="wrap-any rounded-[6px] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[0.92em] text-[var(--fg)]">
           {token.slice(1, -1)}
         </code>,
       )

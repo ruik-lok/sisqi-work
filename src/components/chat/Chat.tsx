@@ -66,7 +66,7 @@ export function SessionList({ onOpenSettings }: { onOpenSettings?: () => void })
           />
         </label>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pb-3">
         {list.length === 0 && <p className="px-3 py-8 text-center text-[12.5px] text-[var(--faint)]">没有匹配的会话</p>}
         {list.map((s) => {
           const active = s.id === activeSession.id
@@ -268,7 +268,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
   }
 
   return (
-    <div ref={ref} className={cn('min-h-0 flex-1 overflow-y-auto', dense ? 'px-4' : 'px-8')}>
+    <div ref={ref} className={cn('min-h-0 flex-1 overflow-x-hidden overflow-y-auto', dense ? 'px-4' : 'px-8')}>
       <div className={cn('mx-auto w-full space-y-6 py-6', dense ? 'max-w-none' : 'max-w-[760px]')}>
         {messages.length === 0 && (
           <div className="grid place-items-center gap-3 py-20 text-center">
@@ -346,7 +346,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
                 </div>
                 {m.reasoning && <ThinkingBlock text={m.reasoning} live={Boolean(m.streaming) && !m.content} />}
               {m.agentTrace && m.agentTrace.length > 0 && (
-                <details className="mt-1.5 max-w-[92%] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11.5px] text-[var(--muted)]">
+                <details className="mt-1.5 w-full max-w-full rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11.5px] text-[var(--muted)]">
                   <summary className="cursor-pointer select-none">
                     {'使用了 ' + m.agentTrace.length + ' 次工具'}
                   </summary>
