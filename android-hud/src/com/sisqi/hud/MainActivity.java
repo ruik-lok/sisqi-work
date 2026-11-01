@@ -30,6 +30,12 @@ public class MainActivity extends Activity {
         root.setPadding(dp(24), dp(48), dp(24), dp(24));
         root.setBackgroundColor(Color.parseColor("#F6F7FB"));
 
+        android.widget.ImageView logo = new android.widget.ImageView(this);
+        logo.setImageResource(R.drawable.ic_launcher);
+        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(64), dp(64));
+        logoLp.bottomMargin = dp(12);
+        root.addView(logo, logoLp);
+
         TextView title = new TextView(this);
         title.setText("DSH HUD");
         title.setTextSize(26);

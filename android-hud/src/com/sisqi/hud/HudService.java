@@ -162,6 +162,8 @@ public class HudService extends Service {
         bg.setCornerRadius(dp(16));
         bg.setStroke(dp(1), Color.parseColor("#664D6BFE"));
         pill.setBackground(bg);
+        pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stat, 0, 0, 0);
+        pill.setCompoundDrawablePadding(dp(6));
 
         pillParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -395,7 +397,7 @@ public class HudService extends Service {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
         b.setContentTitle(text)
                 .setContentText("DSH · 正在操作这台手机")
-                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setSmallIcon(R.drawable.ic_stat)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(pi)
@@ -434,7 +436,7 @@ public class HudService extends Service {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
         return b.setContentTitle(title)
                 .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setSmallIcon(R.drawable.ic_stat)
                 .setContentIntent(pi)
                 .setOngoing(true)
                 .build();
