@@ -111,7 +111,9 @@ final class ShellBridge {
     }
 
     private void emit(String id, String json) {
-        final String js = "window.__sisqiShell&&window.__sisqiShell(" + JSONObject.quote(id) + "," + json + ")";
+        // json 必须作为「字符串」传过去：页面里是 JSON.parse(json)，
+        // 直接拼对象字面量会让 JSON.parse 收到对象而抛错（"返回解析失败"）。
+        final String js = "window.__sisqiShell&&window.__sisqiShell(" + JSONObject.quote(id) + "," + JSONObject.quote(json) + ")";
         ui.post(new Runnable() {
             public void run() {
                 try {
