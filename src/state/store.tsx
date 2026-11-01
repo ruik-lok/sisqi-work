@@ -257,7 +257,18 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     // 本地已保存的模型 + 新版本内置模型（按 id 去重）；顺带清掉早期内置的 deepseek-chat / reasoner 演示条目
     const legacy = new Set(['m_ds', 'm_ds_chat'])
     const merged = (initial.models ?? []).filter((m) => !legacy.has(m.id))
-    for (const m of seedModels) if (!merged.some((x) => x.id === m.id)) merged.push(m)
+    for (const m of seedModels) {
+      const existing = merged.find((x) => x.id === m.id)
+      if (!existing) {
+        merged.push(m)
+        continue
+      }
+      // 老数据里价格为 0 的内置模型：用种子里的官方定价补上（不动用户自己加/改过的模型）
+      if (!existing.priceIn && !existing.priceOut && (m.priceIn || m.priceOut)) {
+        existing.priceIn = m.priceIn
+        existing.priceOut = m.priceOut
+      }
+    }
     return merged.length ? merged : seedModels
   })
   const [providers, setProviders] = useState<Provider[]>(() => {

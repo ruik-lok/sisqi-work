@@ -177,8 +177,10 @@ export const providers: Provider[] = [
 export const models: ModelInfo[] = [
   { id: 'm_gpt52', name: 'gpt-5.2', providerId: 'p_openai', contextK: 400, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具', '结构化', '推理'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_gpt52mini', name: 'gpt-5.2-mini', providerId: 'p_openai', contextK: 200, priceIn: 0.25, priceOut: 2, capabilities: ['文本', '工具', '结构化'], enabled: true, capabilitySource: '供应商元数据' },
-  { id: 'm_ds_flash', name: 'deepseek-flash', label: 'DeepSeek-V4.1-Flash', providerId: 'p_deepseek', contextK: 1024, priceIn: 0, priceOut: 0, capabilities: ['文本', '视觉', '工具', '推理', '结构化'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
-  { id: 'm_ds_pro', name: 'deepseek-v4-pro', label: 'DeepSeek-V4-Pro', providerId: 'p_deepseek', contextK: 1024, priceIn: 0, priceOut: 0, capabilities: ['文本', '工具', '推理'], enabled: true, capabilitySource: '供应商元数据' },
+  // 官方价格（CNY/百万 tokens，高峰时段）：flash 输入 2 / 输出 8；v4-pro 输入 9 / 输出 27
+  // 这里按 1 USD = 7.2 CNY 折算成美元，费用统计与界面一致
+  { id: 'm_ds_flash', name: 'deepseek-flash', label: 'DeepSeek-V4.1-Flash', providerId: 'p_deepseek', contextK: 1024, priceIn: 0.28, priceOut: 1.11, capabilities: ['文本', '视觉', '工具', '推理', '结构化'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
+  { id: 'm_ds_pro', name: 'deepseek-v4-pro', label: 'DeepSeek-V4-Pro', providerId: 'p_deepseek', contextK: 1024, priceIn: 1.25, priceOut: 3.75, capabilities: ['文本', '工具', '推理'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_qwen', name: 'qwen3-coder', providerId: 'p_custom', contextK: 256, priceIn: 0.3, priceOut: 1.2, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '实测' },
 ]
 

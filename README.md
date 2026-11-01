@@ -18,6 +18,7 @@
 - **项目内文本搜索（APK）**：在已接入的目录里按关键字搜索文本文件（最多 40 个文件 / 20 条命中 / 深度 2，跳过大目录），结果显示 `路径:行号` 与命中行，点开即预览原文件。
 - **仓库信息（APK）**：目录里有 `.git` 时，直接读 `HEAD` / `refs` / `config` / `logs/HEAD`，显示真实分支、短 SHA、远端与最近提交；再解析 `.git/index`（v2/v3）对比文件大小与修改时间，给出「已跟踪 N 个文件 · X 个修改 · Y 个删除 · Z 个未跟踪」（node_modules 等目录自动跳过）——不需要 git 二进制，也不改仓库。
 - **用量只算真实请求**：设置页显示本机成功请求数、Token、估算费用、最近延迟，不再使用演示种子数字。
+- **真实计费口径**：deepseek-flash 输入 $0.28/M、输出 $1.11/M；deepseek-v4-pro 输入 $1.25/M、输出 $3.75/M（按官方 CNY 高峰价 ÷7.2 折算，注释写在 `data/work.ts`；空闲时段官方价格是高峰的一半，这里按高峰保守估算）。
 - **深度思考**：V4.1 的 `reasoning_effort`（低 / 高 / 最高）可在输入框旁切换并真实下发；思考过程（`reasoning_content`）流式展示为可折叠灰块，回答结束后自动收起。
 - **模型与 API 管理**：添加 / 编辑 / 删除 Provider，保存或清除 API Key，真实连接测试并自动拉取模型列表，添加 / 删除模型，设置默认模型。
 - **密钥安全**：桌面版用 Electron `safeStorage` 加密落盘（`secrets.json`，已验证不含明文）；APK 用 Android Keystore（AES-256-GCM，`SharedPreferences` 里只有密文）；Web 预览退回本机 localStorage。界面始终只显示掩码。
