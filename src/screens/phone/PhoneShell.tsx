@@ -32,6 +32,7 @@ import { modelLabel } from '../../lib/labels'
 import { deviceInfo, ramGb } from '../../lib/native-device'
 import { formatBytes, isTextMime, listFolder, nativeFolderAvailable, pickFolder, readDoc, type ProjectTree } from '../../lib/native-files'
 import { readGitInfo, shortRemote, type GitInfo } from '../../lib/git-info'
+import { readGitStatus, type GitStatus } from '../../lib/git-status'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -426,6 +427,7 @@ function PhoneProjects() {
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<{ name: string; text: string; truncated?: boolean } | null>(null)
   const [git, setGit] = useState<GitInfo | null>(null)
+  const [gitStatus, setGitStatus] = useState<{ tracked: number; status: GitStatus } | null>(null)
   const [hint, setHint] = useState('')
 
   const load = async (uri: string, docId = '') => {
@@ -438,7 +440,11 @@ function PhoneProjects() {
       }
       setHint('')
       setTree(next)
-      if (!docId) setGit(await readGitInfo(uri))
+      if (!docId) {
+        setGit(await readGitInfo(uri))
+        setGitStatus(null)
+        void readGitStatus(uri).then((s) => setGitStatus(s))
+      }
     } finally {
       setBusy(false)
     }
@@ -549,6 +555,15 @@ function PhoneProjects() {
               {git.sha && <span className="shrink-0 font-mono text-[11px] text-[var(--faint)]">{git.sha}</span>}
               {git.remote && <span className="ml-auto truncate text-[10.5px] text-[var(--faint)]">{shortRemote(git.remote)}</span>}
             </div>
+            {gitStatus && (
+              <p className="mt-1 text-[11px] text-[var(--faint)]">
+                已跟踪 {gitStatus.tracked} 个文件
+                {gitStatus.status.modified > 0 && <span className="text-[var(--warn)]"> · {gitStatus.status.modified} 个修改</span>}
+                {gitStatus.status.deleted > 0 && <span className="text-[var(--danger)]"> · {gitStatus.status.deleted} 个删除</span>}
+                {gitStatus.status.scannedDirs < gitStatus.status.totalDirs && `（扫描 ${gitStatus.status.scannedDirs}/${gitStatus.status.totalDirs} 个目录）`}
+                {gitStatus.status.modified === 0 && gitStatus.status.deleted === 0 && ' · 工作区干净'}
+              </p>
+            )}
             {git.commits.length > 0 && (
               <div className="mt-2 space-y-1.5">
                 {git.commits.slice(0, 3).map((c) => (

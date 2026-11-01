@@ -18,6 +18,8 @@ interface SisqiHostFiles {
   listFolder?: (id: string, treeUri: string, docId: string) => void
   readDoc?: (id: string, treeUri: string, docId: string) => void
   readPath?: (id: string, treeUri: string, path: string) => void
+  readPathB64?: (id: string, treeUri: string, path: string) => void
+  listPath?: (id: string, treeUri: string, path: string) => void
 }
 
 export interface ProjectFile {
@@ -175,5 +177,37 @@ export function readTreePath(treeUri: string, path: string): Promise<string | nu
   return new Promise((resolve) => {
     docWaiters.set(id, (doc) => resolve(doc ? doc.text : null))
     host.readPath!(id, treeUri, path)
+  })
+}
+/** 按相对路径读取二进制（base64 解码），用于 .git/index */
+export function readTreePathBytes(treeUri: string, path: string): Promise<Uint8Array | null> {
+  const host = window.SisqiHost
+  if (!host?.readPathB64) return Promise.resolve(null)
+  const id = `b${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    docWaiters.set(id, (doc) => {
+      const raw = (doc as unknown as { b64?: string } | null)?.b64
+      if (!raw) return resolve(null)
+      try {
+        const bin = atob(raw)
+        const out = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+        resolve(out)
+      } catch {
+        resolve(null)
+      }
+    })
+    host.readPathB64!(id, treeUri, path)
+  })
+}
+
+/** 按相对路径列目录（'' 为根） */
+export function listTreePath(treeUri: string, path: string): Promise<ProjectTree | null> {
+  const host = window.SisqiHost
+  if (!host?.listPath) return Promise.resolve(null)
+  const id = `q${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    folderWaiters.set(id, resolve)
+    host.listPath!(id, treeUri, path)
   })
 }
