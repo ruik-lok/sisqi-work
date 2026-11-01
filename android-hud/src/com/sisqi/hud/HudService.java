@@ -136,17 +136,23 @@ public class HudService extends Service {
                 try {
                     server = new ServerSocket(PORT, 8, InetAddress.getByName("127.0.0.1"));
                     while (running) {
-                        Socket s = server.accept();
-                        try {
-                            handle(s);
-                        } catch (Exception e) {
-                            Log.w("HUD", "handle: " + e);
-                        } finally {
-                            try {
-                                s.close();
-                            } catch (Exception ignore) {
+                        final Socket s = server.accept();
+                        // 每个连接单独线程 + 读超时：避免一个半开连接把 accept 循环卡死
+                        new Thread(new Runnable() {
+                            public void run() {
+                                try {
+                                    s.setSoTimeout(5000);
+                                    handle(s);
+                                } catch (Exception e) {
+                                    Log.w("HUD", "handle: " + e);
+                                } finally {
+                                    try {
+                                        s.close();
+                                    } catch (Exception ignore) {
+                                    }
+                                }
                             }
-                        }
+                        }, "hud-conn").start();
                     }
                 } catch (Exception e) {
                     Log.w("HUD", "server: " + e);

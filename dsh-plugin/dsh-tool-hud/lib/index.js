@@ -44,9 +44,13 @@ const outSchema = {
   }
 };
 
-/** 工具结果展示：成功就说一句，失败带上原因 */
-const render = (args, v) =>
-  v && v.ok ? "已更新流体云" : "流体云更新失败：" + ((v && v.error) || "HUD 应用没在运行");
+/** 工具结果展示：必须返回内容块数组（框架会对它调用 .some） */
+const render = (args, v) => [
+  {
+    type: "text",
+    text: v && v.ok ? "已更新流体云" : "流体云更新失败：" + ((v && v.error) || "HUD 应用没在运行")
+  }
+];
 
 function apply(ctx) {
   ctx.tools.register(defineTool({
