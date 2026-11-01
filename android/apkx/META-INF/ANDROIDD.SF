@@ -1,0 +1,80 @@
+Signature-Version: 1.0
+Created-By: 1.0 (Android)
+SHA-256-Digest-Manifest: z6qlsAlQco0VB871Gy20bRrk3yhNjsojTgSoISc74fo=
+X-Android-APK-Signed: 2, 3
+
+Name: AndroidManifest.xml
+SHA-256-Digest: /ZOW8EBjhnhYZeqHDfnKRwOZC2UvNhKDbgFJbKF3ZjU=
+
+Name: assets/www/assets/index-CtnW8zQ4.css
+SHA-256-Digest: 3NBBgjevnyoiLL89PWOIanRUz3EInVLJ8bESDumwGtw=
+
+Name: assets/www/assets/index-vebvQwYj.js
+SHA-256-Digest: ycNm7SP8jywlayybGxJOcAoTt772KD9gR+gDidzQIZw=
+
+Name: assets/www/favicon.svg
+SHA-256-Digest: bhI0H7+7UqrpTTXhhsYxVJsrmKzaAAr49U2Ctj+O7bE=
+
+Name: assets/www/fonts/f1.woff2
+SHA-256-Digest: KiqjdNNRvNRxIQsqinZAw9Tf5tPoCTOR3uc4MiQHgZM=
+
+Name: assets/www/fonts/f10.woff2
+SHA-256-Digest: M7LQUPuel23CmisDEwXGuhYm9q01b0ojqB1NE4M+USE=
+
+Name: assets/www/fonts/f11.woff2
+SHA-256-Digest: h0VY6BYQ21M8HrFCEk6oOBu7Wn3zWAKQjEVFLenZtVk=
+
+Name: assets/www/fonts/f12.woff2
+SHA-256-Digest: +XVn7AZCwEaxtTLl7bqVJ81RHpba9GDG1JG49OjeJ+o=
+
+Name: assets/www/fonts/f2.woff2
+SHA-256-Digest: 6WPqEOBXkuMw/Y2GdCfVKeYC1ld6wWFSoylLgi2bunE=
+
+Name: assets/www/fonts/f3.woff2
+SHA-256-Digest: oA8LcB6KvcFdGBOWbDctsqIu+l9kgIWi1v1lPGqwW/I=
+
+Name: assets/www/fonts/f4.woff2
+SHA-256-Digest: hvpSrYCx4qGWBJXrU4UzwZQCgnvpLOjuS+tJPy8gRiI=
+
+Name: assets/www/fonts/f5.woff2
+SHA-256-Digest: VdYAy6AFlATCeIEyvLkaMEYSToKPtaZpuHqFGO7qPrU=
+
+Name: assets/www/fonts/f6.woff2
+SHA-256-Digest: wYLtXShp7T8Nm0O5M7BgBfLJ0vT5KcXq/ij94+ArCC4=
+
+Name: assets/www/fonts/f7.woff2
+SHA-256-Digest: HV4aIDLFzs0v79i8HIiqWyrmemf8J4HXRClv4fzmzRc=
+
+Name: assets/www/fonts/f8.woff2
+SHA-256-Digest: EuoFGc+llzNARfS7k7r2ZWSbVybVVXxpaB4wEgSh86k=
+
+Name: assets/www/fonts/f9.woff2
+SHA-256-Digest: pzHsYNmrlK2zIFn05QkYpqeVKCn/QoHHnd62rQeicto=
+
+Name: assets/www/fonts/fonts.css
+SHA-256-Digest: nB9aEpgYwlamTPpxnNesRyAAoqeON4U+D7JHXjXs/P8=
+
+Name: assets/www/fonts/inter-400.woff2
+SHA-256-Digest: miqqV9DYECkjI0hPuvbrSZfBx9qlyeib/dehCUTQYEA=
+
+Name: assets/www/fonts/inter-500.woff2
+SHA-256-Digest: 30KpdjnLDn/i36mwi8e5hfKMhYck+wKOQMWMgNVfktU=
+
+Name: assets/www/fonts/inter-600.woff2
+SHA-256-Digest: hMefnSgY/bvygSACLe9skwkOc3ghHgV/gnhQHrofIVk=
+
+Name: assets/www/fonts/inter-700.woff2
+SHA-256-Digest: J+EFqJeMrY5n+/reBjz7WxvjDJANjAWtg7/SfYNKWG4=
+
+Name: assets/www/index.html
+SHA-256-Digest: S3teVnYzHrTJxPpNQxOQZFF3tuyB7WY7dRiMx91KQiY=
+
+Name: classes.dex
+SHA-256-Digest: DOuZcHXVQaAeckYnpFZYHsVpm8xKcn/mu4AEiQ54YnU=
+
+Name: res/drawable/ic_launcher.xml
+SHA-256-Digest: q20Ei5nK2NHyMIv8BrRVoBnoCz4AW6+pMxJn3GKr5jI=
+
+Name: resources.arsc
+SHA-256-Digest: rZ0gh6Obcb6VYfoCbNbgcm4I9NT760IKOfw2jdP6yQk=
+

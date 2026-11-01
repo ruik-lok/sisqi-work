@@ -73,6 +73,7 @@ public class MainActivity extends Activity {
         secrets = new SecretStore(this);
         web.addJavascriptInterface(new Host(), "SisqiHost");
         web.addJavascriptInterface(new HttpBridge(web), "SisqiHttp");
+        web.addJavascriptInterface(new ShellBridge(web), "SisqiShell");
         applyChrome(!systemInNightMode());
 
         web.setWebViewClient(new WebViewClient() {

@@ -259,3 +259,86 @@ async function streamChatNative(opts: StreamOptions): Promise<{ text: string; us
 
   return { text, usage }
 }
+export interface AgentToolCall {
+  id: string
+  name: string
+  arguments: string
+}
+
+export type AgentMessage =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
+  | { role: 'tool'; content: string; tool_call_id: string }
+
+export interface ToolCompletion {
+  content: string
+  reasoning: string
+  toolCalls: AgentToolCall[]
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number }
+}
+
+/** 非流式 + 工具调用（Agent 模式用）：返回完整回复与 tool_calls */
+export async function completeWithTools(opts: {
+  baseUrl: string
+  apiKey: string
+  model: string
+  messages: AgentMessage[]
+  tools: unknown[]
+  reasoningEffort?: ReasoningEffort
+  signal?: AbortSignal
+}): Promise<ToolCompletion> {
+  const url = `${joinUrl(opts.baseUrl)}/chat/completions`
+  const body = JSON.stringify({
+    model: opts.model,
+    messages: opts.messages,
+    tools: opts.tools,
+    tool_choice: 'auto',
+    stream: false,
+    ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+  })
+  const auth = `Bearer ${opts.apiKey}`
+
+  let raw = ''
+  let status = 0
+  if (nativeHttpAvailable()) {
+    const res = nativeRequest('POST', url, auth, body)
+    if ('error' in res) throw new LlmError({ message: res.error })
+    raw = res.body
+    status = res.status
+  } else {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body,
+      signal: opts.signal,
+    })
+    status = r.status
+    raw = await r.text()
+  }
+  if (status < 200 || status >= 300) {
+    throw new LlmError({ status, message: `HTTP ${status}`, hint: hintFor(status) })
+  }
+  let json: {
+    choices?: Array<{ message?: { content?: string; reasoning_content?: string; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }> } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+  }
+  try {
+    json = JSON.parse(raw)
+  } catch {
+    throw new LlmError({ message: '返回不是合法 JSON' })
+  }
+  const msg = json.choices?.[0]?.message ?? {}
+  const calls = msg.tool_calls ?? []
+  return {
+    content: String(msg.content ?? ''),
+    reasoning: String(msg.reasoning_content ?? ''),
+    toolCalls: calls.map((c, i) => ({ id: c.id ?? `call_${i}`, name: c.function?.name ?? '', arguments: c.function?.arguments ?? '{}' })),
+    usage: json.usage
+      ? {
+          promptTokens: json.usage.prompt_tokens,
+          completionTokens: json.usage.completion_tokens,
+          totalTokens: json.usage.total_tokens,
+        }
+      : undefined,
+  }
+}

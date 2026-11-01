@@ -345,6 +345,20 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
                   {m.mode === 'demo' && !m.streaming && <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10.5px] text-[var(--faint)]">演示</span>}
                 </div>
                 {m.reasoning && <ThinkingBlock text={m.reasoning} live={Boolean(m.streaming) && !m.content} />}
+              {m.agentTrace && m.agentTrace.length > 0 && (
+                <details className="mt-1.5 max-w-[92%] rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11.5px] text-[var(--muted)]">
+                  <summary className="cursor-pointer select-none">
+                    {'使用了 ' + m.agentTrace.length + ' 次工具'}
+                  </summary>
+                  <div className="mt-1 space-y-0.5 font-mono text-[11px] text-[var(--faint)]">
+                    {m.agentTrace.map((t, i) => (
+                      <div key={i} className="truncate">
+                        · {t.name} {t.args.slice(0, 70)}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
                 <div className={cn('mt-1 text-[15px] leading-[1.75] text-[var(--fg)]', dense && 'text-[14.5px]')}>
                   {m.content ? <MarkdownText text={m.content} /> : m.streaming && !m.reasoning ? <span className="text-[var(--faint)]">正在思考…</span> : null}
                   {m.streaming && <span className="ml-0.5 mt-1 inline-block h-4 w-[2px] bg-[var(--accent)] anim-pulse" />}

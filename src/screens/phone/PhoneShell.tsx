@@ -35,6 +35,7 @@ import { deviceInfo, ramGb } from '../../lib/native-device'
 import { formatBytes, isTextMime, listFolder, nativeFolderAvailable, pickFolder, readDoc, type ProjectTree } from '../../lib/native-files'
 import { readGitInfo, shortRemote, type GitInfo } from '../../lib/git-info'
 import { readGitStatus, type GitStatus } from '../../lib/git-status'
+import { nativeShellAvailable, openApp, resetRootCache, rootAvailable, runShell } from '../../lib/native-shell'
 import { searchText, type SearchResult } from '../../lib/fs-search'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
@@ -64,7 +65,18 @@ export function PhoneShell({
   setRoute: (r: PhoneRoute) => void
   onOpenApproval: () => void
 }) {
-  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId, pauseTask, resumeTask, cancelTask, toast, usage } = useNexus()
+  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId, pauseTask, resumeTask, cancelTask, toast, usage, agentMode, setAgentMode } = useNexus()
+  const [rootState, setRootState] = useState<boolean | null>(null)
+  const [probe, setProbe] = useState('')
+  useEffect(() => {
+    let alive = true
+    void rootAvailable().then((ok) => {
+      if (alive) setRootState(ok)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [taskSheet, setTaskSheet] = useState(false)
   const [skillsOpen, setSkillsOpen] = useState(false)
@@ -253,6 +265,48 @@ export function PhoneShell({
                   </p>
                   <p className="text-[11.5px] text-[var(--faint)]">Root Provider 待检测 · 与平板独立授权</p>
                 </>
+              )}
+            </section>
+
+            <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[13.5px] text-[var(--fg)]">Agent 能力</span>
+                <Toggle checked={agentMode} onChange={setAgentMode} label="Agent 工具" />
+              </div>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--faint)]">
+                开启后，对话里模型可以调用设备工具：读屏、点击、滑动、输入、启动应用、执行 root 命令。
+              </p>
+              <p className="mt-1 text-[11.5px] text-[var(--faint)]">
+                Root：{rootState === null ? '检测中…' : rootState ? '可用' : '未授权'} · 命令通道：
+                {nativeShellAvailable() ? '已注入' : '未注入'}
+              </p>
+              {probe && <p className="mt-1 break-all font-mono text-[10.5px] text-[var(--faint)]">{probe}</p>}
+              <button
+                className="mt-1 text-[11px] text-[var(--accent)]"
+                onClick={() => {
+                  setProbe('测试中…')
+                  void runShell('id -u', 8000).then((res) => setProbe(`exit=${res.code} out=${res.out.trim() || '—'} err=${res.err.trim().slice(0, 80) || '—'}`))
+                }}
+              >
+                测试命令
+              </button>
+              {rootState === false && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <Button size="sm" variant="secondary" onClick={() => openApp('me.weishu.kernelsu')}>
+                    打开 KernelSU 授权
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      resetRootCache()
+                      setRootState(null)
+                      void rootAvailable().then(setRootState)
+                    }}
+                  >
+                    重新检测
+                  </Button>
+                </div>
               )}
             </section>
 

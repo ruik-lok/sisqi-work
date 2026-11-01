@@ -26,7 +26,8 @@ import {
   type Session,
   type ThemeMode,
 } from '../data/work'
-import { LlmError, streamChat, testProvider as probeProvider, type LlmContentPart, type LlmMessage, type ReasoningEffort } from '../lib/llm'
+import { LlmError, streamChat, testProvider as probeProvider, type LlmContentPart, type LlmMessage, type ReasoningEffort, type AgentMessage } from '../lib/llm'
+import { AGENT_SYSTEM_PROMPT, runAgent } from '../lib/agent'
 import { maskKey, secretStore } from '../lib/secrets'
 
 export type { ThemeMode }
@@ -81,6 +82,8 @@ interface PersistShape {
   theme: ThemeMode
   density: Density
   effort?: ReasoningEffort
+  /** Agent 模式（工具调用）开关 */
+  agentMode?: boolean
   modelId: string
   sessions: Session[]
   messages: Record<string, ChatMessage[]>
@@ -97,6 +100,9 @@ interface Store {
   /** 深度思考强度 */
   effort: ReasoningEffort
   setEffort: (e: ReasoningEffort) => void
+  /** Agent 模式：允许模型调用设备工具（读屏/点击/命令） */
+  agentMode: boolean
+  setAgentMode: (on: boolean) => void
   density: Density
   setDensity: (d: Density) => void
 
@@ -229,6 +235,11 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     const candidate = fromUrl ?? initial.effort ?? 'high'
     return candidate === 'low' || candidate === 'high' || candidate === 'max' ? candidate : 'high'
   })
+  const [agentMode, setAgentModeState] = useState<boolean>(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('agent')
+    return fromUrl ? fromUrl !== '0' : Boolean(initial.agentMode)
+  })
+  const setAgentMode = useCallback((on: boolean) => setAgentModeState(on), [])
   const [density, setDensityState] = useState<Density>(() => (new URLSearchParams(window.location.search).get('ui') as Density | null) ?? initial.density ?? 'pro')
 
   const [sessionList, setSessionList] = useState<Session[]>(() => {
@@ -355,6 +366,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       theme,
       density,
       effort,
+      agentMode,
       modelId,
       sessions: sessionList,
       messages: messagesMap,
@@ -370,7 +382,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       }
     }, 250)
     return () => window.clearTimeout(t)
-  }, [theme, density, effort, modelId, sessionList, messagesMap, providers, modelList, usage])
+  }, [theme, density, effort, agentMode, modelId, sessionList, messagesMap, providers, modelList, usage])
 
   const toast = useCallback((t: Omit<ToastItem, 'id'>) => {
     const id = toastSeq.current++
@@ -503,6 +515,67 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       touchSession(activeSessionId, { status: 'running' })
       appendMessages(activeSessionId, [{ id: assistantId, role: 'assistant', content: '', time: clock(), streaming: true, mode: 'live' }])
 
+      if (agentMode) {
+        try {
+          const agentMessages: AgentMessage[] = [
+            { role: 'system', content: AGENT_SYSTEM_PROMPT },
+            ...llmMessages.map((m) => ({
+              role: m.role as 'user' | 'assistant',
+              content:
+                typeof m.content === 'string'
+                  ? m.content
+                  : m.content.map((part) => (part.type === 'text' ? part.text : '[图片]')).join('\n'),
+            })),
+          ]
+          const result = await runAgent({
+            baseUrl: provider.baseUrl,
+            apiKey,
+            model: activeModel.name,
+            messages: agentMessages,
+            reasoningEffort: activeModel.capabilities.includes('推理') ? effort : undefined,
+            onTrace: (trace) => patchMessage(activeSessionId, assistantId, { agentTrace: trace }),
+            onPhase: (phase) => patchMessage(activeSessionId, assistantId, { content: phase }),
+          })
+          const latency = Math.round(performance.now() - startedAt)
+          patchMessage(activeSessionId, assistantId, {
+            streaming: false,
+            content: result.content || '（已完成）',
+            reasoning: result.reasoning,
+            agentTrace: result.trace,
+            time: clock(),
+          })
+          setProviders((prev) =>
+            prev.map((p) => (p.id === provider.id ? { ...p, status: 'connected', latencyMs: latency, lastTest: `今天 ${clock()}` } : p)),
+          )
+          setUsage((prev) => ({
+            requests: prev.requests + 1,
+            promptTokens: prev.promptTokens + (result.usage?.promptTokens ?? 0),
+            completionTokens: prev.completionTokens + (result.usage?.completionTokens ?? 0),
+            costUsd:
+              prev.costUsd +
+              ((result.usage?.promptTokens ?? 0) / 1_000_000) * activeModel.priceIn +
+              ((result.usage?.completionTokens ?? 0) / 1_000_000) * activeModel.priceOut,
+            lastLatencyMs: latency,
+            lastErrorAt: prev.lastErrorAt,
+          }))
+          touchSession(activeSessionId, { status: 'idle', preview: result.content.slice(0, 40) || '已执行' })
+        } catch (err) {
+          const info = err instanceof LlmError ? err.info : { message: (err as Error).message }
+          patchMessage(activeSessionId, assistantId, { streaming: false, content: `执行失败：${info.message}` })
+          setChatError({
+            title: info.status ? `工具调用失败（HTTP ${info.status}）` : '工具调用失败',
+            detail: info.message,
+            hint: info.hint,
+            status: info.status,
+          })
+          touchSession(activeSessionId, { status: 'idle' })
+        } finally {
+          abortRef.current = null
+          setStreaming(false)
+        }
+        return
+      }
+
       let text = ''
       let reasoning = ''
       let usageInfo: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined
@@ -566,7 +639,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
         setStreaming(false)
       }
     },
-    [activeModel, activeSessionId, appendMessages, effort, patchMessage, providers, toast, touchSession],
+    [activeModel, activeSessionId, agentMode, appendMessages, effort, patchMessage, providers, toast, touchSession],
   )
 
   const sendMessage = useCallback(
@@ -836,6 +909,8 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       setTheme: setThemeState,
       effort,
       setEffort,
+      agentMode,
+      setAgentMode,
       density,
       setDensity: setDensityState,
       sessions: sessionList,
