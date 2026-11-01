@@ -49,10 +49,26 @@ public class HudService extends Service {
     private int pillX = 24;
     private int pillY = 180;
     private NotificationManager nm;
-    private long lastPromoteAt = 0;
-    private String pendingPromote;
-    private boolean promoteScheduled = false;
-    private String lastTitle = "DSH 操作中";
+    private String cloudText = "DSH 就绪";
+    private long lastEventAt = android.os.SystemClock.uptimeMillis();
+    private long lastCloudAt = 0;
+    private Runnable pendingCloud;
+
+    /** 心跳：有活动时每 20s 续一次，30s 无事件就撤掉流体云 */
+    private final Runnable heartbeat = new Runnable() {
+        public void run() {
+            long idle = android.os.SystemClock.uptimeMillis() - lastEventAt;
+            if (idle <= 30000) {
+                pushCloudNow();
+                ui.postDelayed(this, 20000);
+            } else if (nm != null) {
+                try {
+                    nm.cancel(3);
+                } catch (Throwable ignore) {
+                }
+            }
+        }
+    };
     private final Handler ui = new Handler(Looper.getMainLooper());
     private ServerSocket server;
     private volatile boolean running = false;
@@ -73,6 +89,7 @@ public class HudService extends Service {
         startServer();
         isRunning = true;
         sendStatus("DSH 就绪");
+        ui.postDelayed(heartbeat, 20000);
     }
 
     @Override
@@ -347,30 +364,26 @@ public class HudService extends Service {
 
     /* --------------------------------------------- 流体云（实时更新通知） */
 
+    /** 状态变化：胶囊立即更新；流体云按 ~900ms 合并推送（系统本身还有一层节流） */
     private void promote(final String text) {
-        long now = android.os.SystemClock.uptimeMillis();
-        if (now - lastPromoteAt < 350) {
-            pendingPromote = text;
-            if (!promoteScheduled) {
-                promoteScheduled = true;
-                ui.postDelayed(new Runnable() {
-                    public void run() {
-                        promoteScheduled = false;
-                        String t = pendingPromote;
-                        pendingPromote = null;
-                        if (t != null) promoteNow(t);
-                    }
-                }, 360);
+        cloudText = text;
+        lastEventAt = android.os.SystemClock.uptimeMillis();
+        if (pendingCloud != null) ui.removeCallbacks(pendingCloud);
+        long wait = Math.max(0, 900 - (android.os.SystemClock.uptimeMillis() - lastCloudAt));
+        pendingCloud = new Runnable() {
+            public void run() {
+                pendingCloud = null;
+                pushCloudNow();
             }
-            return;
-        }
-        promoteNow(text);
+        };
+        ui.postDelayed(pendingCloud, wait);
     }
 
-    private void promoteNow(String text) {
-        lastPromoteAt = android.os.SystemClock.uptimeMillis();
+    private void pushCloudNow() {
+        lastCloudAt = android.os.SystemClock.uptimeMillis();
+        if (nm == null) return;
         try {
-            nm.notify(3, buildPromoted(text));
+            nm.notify(3, buildPromoted(cloudText));
         } catch (Throwable e) {
             Log.w("HUD", "promote failed: " + e);
         }
