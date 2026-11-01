@@ -167,3 +167,63 @@ export async function fetchRepoDetail(token: string, fullName: string): Promise<
     commits,
   }
 }
+export interface GithubIssue {
+  number: number
+  title: string
+  user?: string
+  comments: number
+  updatedAt: string
+  labels: string[]
+}
+
+export interface GithubPull {
+  number: number
+  title: string
+  user?: string
+  updatedAt: string
+  draft: boolean
+  head?: string
+}
+
+/** 打开的 issue（/issues 里会混入 PR，按 pull_request 字段剔除） */
+export async function fetchIssues(token: string, fullName: string, perPage = 10): Promise<GithubIssue[]> {
+  const list = (await ghGet(`/repos/${fullName}/issues?state=open&per_page=${perPage}`, token)) as Array<{
+    number: number
+    title: string
+    user?: { login?: string }
+    comments?: number
+    updated_at?: string
+    labels?: Array<{ name?: string }>
+    pull_request?: unknown
+  }>
+  return list
+    .filter((i) => !i.pull_request)
+    .map((i) => ({
+      number: i.number,
+      title: i.title,
+      user: i.user?.login,
+      comments: i.comments ?? 0,
+      updatedAt: i.updated_at ?? '',
+      labels: (i.labels ?? []).map((l) => l.name ?? '').filter(Boolean).slice(0, 3),
+    }))
+}
+
+/** 打开的 PR */
+export async function fetchPulls(token: string, fullName: string, perPage = 10): Promise<GithubPull[]> {
+  const list = (await ghGet(`/repos/${fullName}/pulls?state=open&per_page=${perPage}`, token)) as Array<{
+    number: number
+    title: string
+    user?: { login?: string }
+    updated_at?: string
+    draft?: boolean
+    head?: { ref?: string }
+  }>
+  return list.map((p) => ({
+    number: p.number,
+    title: p.title,
+    user: p.user?.login,
+    updatedAt: p.updated_at ?? '',
+    draft: Boolean(p.draft),
+    head: p.head?.ref,
+  }))
+}

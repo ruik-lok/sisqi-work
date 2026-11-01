@@ -9,12 +9,17 @@ import {
   GithubError,
   fetchGithubRepos,
   fetchGithubUser,
+  fetchIssues,
+  fetchPulls,
   fetchRepoDetail,
   relativeDate,
+  type GithubIssue,
+  type GithubPull,
   type GithubRepo,
   type GithubRepoDetail,
   type GithubUser,
 } from '../../lib/github'
+import { cn } from '../../lib/cn'
 
 const TOKEN_ID = 'github'
 
@@ -30,6 +35,11 @@ export function GithubConnector() {
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState<GithubRepoDetail | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
+  const [tab, setTab] = useState<'commits' | 'issues' | 'pulls'>('commits')
+  const [issues, setIssues] = useState<GithubIssue[] | null>(null)
+  const [pulls, setPulls] = useState<GithubPull[] | null>(null)
+  const [tabBusy, setTabBusy] = useState(false)
+  const [repoQuery, setRepoQuery] = useState('')
 
   const load = async (tk: string) => {
     setBusy(true)
@@ -89,10 +99,61 @@ export function GithubConnector() {
     if (!token) return
     setDetailBusy(true)
     setDetail(null)
+    setTab('commits')
+    setIssues(null)
+    setPulls(null)
     try {
       setDetail(await fetchRepoDetail(token, repo.fullName))
     } catch (e) {
       toast({ title: '读取仓库失败', detail: e instanceof GithubError ? e.message : '未知错误', tone: 'danger' })
+    } finally {
+      setDetailBusy(false)
+    }
+  }
+
+  const switchTab = async (next: 'commits' | 'issues' | 'pulls') => {
+    setTab(next)
+    if (!token || !detail) return
+    if (next === 'issues' && !issues) {
+      setTabBusy(true)
+      try {
+        setIssues(await fetchIssues(token, detail.fullName))
+      } catch (e) {
+        toast({ title: '读取 Issue 失败', detail: e instanceof GithubError ? e.message : '未知错误', tone: 'danger' })
+        setIssues([])
+      } finally {
+        setTabBusy(false)
+      }
+    }
+    if (next === 'pulls' && !pulls) {
+      setTabBusy(true)
+      try {
+        setPulls(await fetchPulls(token, detail.fullName))
+      } catch (e) {
+        toast({ title: '读取 PR 失败', detail: e instanceof GithubError ? e.message : '未知错误', tone: 'danger' })
+        setPulls([])
+      } finally {
+        setTabBusy(false)
+      }
+    }
+  }
+
+  const openByName = async () => {
+    const name = repoQuery.trim()
+    if (!token || !/^[\w.-]+\/[\w.-]+$/.test(name)) {
+      toast({ title: '格式应为 owner/repo', tone: 'warn' })
+      return
+    }
+    setDetailBusy(true)
+    setDetail(null)
+    setTab('commits')
+    setIssues(null)
+    setPulls(null)
+    try {
+      setDetail(await fetchRepoDetail(token, name))
+      setRepoQuery('')
+    } catch (e) {
+      toast({ title: '打开仓库失败', detail: e instanceof GithubError ? e.message : '未知错误', tone: 'danger' })
     } finally {
       setDetailBusy(false)
     }
@@ -170,21 +231,95 @@ export function GithubConnector() {
               {detail && (
                 <>
                   {detail.description && <p className="mt-2 text-[12px] leading-relaxed text-[var(--muted)]">{detail.description}</p>}
-                  <p className="label mt-4">最近提交</p>
-                  <div className="mt-1.5 space-y-1">
-                    {detail.commits.map((c) => (
-                      <div key={c.sha} className="flex items-baseline gap-2">
-                        <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
-                        <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--fg)]">{c.message}</span>
-                        <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{relativeDate(c.date)}</span>
-                      </div>
+
+                  <div className="mt-3 flex gap-1 rounded-full bg-[var(--surface-2)] p-1">
+                    {[
+                      { id: 'commits' as const, label: `提交 ${detail.commits.length}` },
+                      { id: 'issues' as const, label: `Issues${issues ? ` ${issues.length}` : ''}` },
+                      { id: 'pulls' as const, label: `PR${pulls ? ` ${pulls.length}` : ''}` },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => void switchTab(item.id)}
+                        className={cn(
+                          'flex-1 rounded-full py-1.5 text-[12px] transition-colors',
+                          tab === item.id ? 'bg-[var(--surface)] text-[var(--fg)] shadow-[var(--shadow-1)]' : 'text-[var(--muted)]',
+                        )}
+                      >
+                        {item.label}
+                      </button>
                     ))}
-                    {!detail.commits.length && <p className="text-[12px] text-[var(--faint)]">没有读到提交（空仓库或权限不足）</p>}
                   </div>
-                  <p className="label mt-4">README</p>
-                  <div className="mt-1.5 max-h-[300px] overflow-y-auto rounded-[14px] bg-[var(--surface-2)] p-3 text-[12.5px] leading-relaxed">
-                    {detail.readme ? <MarkdownText text={detail.readme} /> : <p className="text-[12px] text-[var(--faint)]">没有 README</p>}
+
+                  <div className="mt-2">
+                    {tab === 'commits' && (
+                      <div className="space-y-1">
+                        {detail.commits.map((c) => (
+                          <div key={c.sha} className="flex items-baseline gap-2">
+                            <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
+                            <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--fg)]">{c.message}</span>
+                            <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{relativeDate(c.date)}</span>
+                          </div>
+                        ))}
+                        {!detail.commits.length && <p className="text-[12px] text-[var(--faint)]">没有读到提交（空仓库或权限不足）</p>}
+                      </div>
+                    )}
+
+                    {tab === 'issues' && (
+                      <div className="space-y-1.5">
+                        {tabBusy && <p className="text-[12px] text-[var(--faint)]">读取中…</p>}
+                        {issues?.map((i) => (
+                          <div key={i.number} className="rounded-[12px] bg-[var(--surface-2)] px-2.5 py-2">
+                            <p className="flex items-baseline gap-2">
+                              <span className="shrink-0 font-mono text-[11px] text-[var(--faint)]">#{i.number}</span>
+                              <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg)]">{i.title}</span>
+                              <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{relativeDate(i.updatedAt)}</span>
+                            </p>
+                            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--faint)]">
+                              {i.user && <span>{i.user}</span>}
+                              {i.comments > 0 && <span>· {i.comments} 条评论</span>}
+                              {i.labels.map((l) => (
+                                <span key={l} className="rounded-full bg-[var(--surface)] px-1.5 py-0.5">
+                                  {l}
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        ))}
+                        {issues && !issues.length && <p className="px-1 py-3 text-[12px] text-[var(--faint)]">没有打开的 Issue</p>}
+                      </div>
+                    )}
+
+                    {tab === 'pulls' && (
+                      <div className="space-y-1.5">
+                        {tabBusy && <p className="text-[12px] text-[var(--faint)]">读取中…</p>}
+                        {pulls?.map((pr) => (
+                          <div key={pr.number} className="rounded-[12px] bg-[var(--surface-2)] px-2.5 py-2">
+                            <p className="flex items-baseline gap-2">
+                              <span className="shrink-0 font-mono text-[11px] text-[var(--faint)]">#{pr.number}</span>
+                              <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg)]">{pr.title}</span>
+                              <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{relativeDate(pr.updatedAt)}</span>
+                            </p>
+                            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--faint)]">
+                              {pr.user && <span>{pr.user}</span>}
+                              {pr.head && <span className="font-mono">· {pr.head}</span>}
+                              {pr.draft && <span className="rounded-full bg-[var(--surface)] px-1.5 py-0.5">草稿</span>}
+                            </p>
+                          </div>
+                        ))}
+                        {pulls && !pulls.length && <p className="px-1 py-3 text-[12px] text-[var(--faint)]">没有打开的 PR</p>}
+                      </div>
+                    )}
                   </div>
+
+                  {tab === 'commits' && (
+                    <>
+                      <p className="label mt-4">README</p>
+                      <div className="mt-1.5 max-h-[300px] overflow-y-auto rounded-[14px] bg-[var(--surface-2)] p-3 text-[12.5px] leading-relaxed">
+                        {detail.readme ? <MarkdownText text={detail.readme} /> : <p className="text-[12px] text-[var(--faint)]">没有 README</p>}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </>
@@ -203,6 +338,18 @@ export function GithubConnector() {
                 </Button>
               </div>
               {error && <p className="mt-2 text-[11.5px] text-[var(--danger)]">{error}</p>}
+              <div className="mt-3 flex items-center gap-1.5">
+                <input
+                  value={repoQuery}
+                  onChange={(e) => setRepoQuery(e.target.value)}
+                  placeholder="打开仓库 owner/repo"
+                  autoComplete="off"
+                  className="h-9 min-w-0 flex-1 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-2.5 font-mono text-[11.5px] text-[var(--fg)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <Button size="sm" variant="secondary" disabled={!repoQuery.trim()} onClick={() => void openByName()}>
+                  打开
+                </Button>
+              </div>
               <p className="label mt-4">最近更新</p>
               <div className="mt-1.5 space-y-1.5">
                 {repos.map((r) => (
