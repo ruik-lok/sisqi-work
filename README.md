@@ -6,13 +6,13 @@
 **定位**：个人 AI 开发工作站；以 AI 会话为入口，以 Agent 执行和项目成果为核心。  
 **标语**：让想法，真正成为作品。
 
-> 本仓库是可在 Windows 上直接运行的桌面应用 + 浏览器预览。**会话、模型调用、密钥、会话管理与备份是真实功能**；Agent 任务、设备与审批仍为演示数据，未实测项一律标注「待检测」。
+> 本仓库是可在 Windows 上直接运行的桌面应用、Android APK 与浏览器预览。**会话、模型调用、密钥、会话管理与备份是真实功能**；Agent 任务、设备与审批仍为演示数据，未实测项一律标注「待检测」。
 
 ## 现在真的能用的功能
 
 - **真实模型对话**：支持任意 OpenAI 兼容端点（OpenAI、DeepSeek、自建网关…），SSE 流式输出，可停止、可重试、可切换模型。
 - **模型与 API 管理**：添加 / 编辑 / 删除 Provider，保存或清除 API Key，真实连接测试并自动拉取模型列表，添加 / 删除模型，设置默认模型。
-- **密钥安全**：桌面版用 Electron `safeStorage` 加密落盘（`secrets.json`，已验证不含明文）；Web 预览退回本机 localStorage。界面始终只显示掩码。
+- **密钥安全**：桌面版用 Electron `safeStorage` 加密落盘（`secrets.json`，已验证不含明文）；APK 用 Android Keystore（AES-256-GCM，`SharedPreferences` 里只有密文）；Web 预览退回本机 localStorage。界面始终只显示掩码。
 - **会话与消息持久化**：刷新、重启后会话与消息仍在；支持新建、重命名、置顶、删除、搜索。
 - **用量统计**：按 Provider 返回的 usage 累计请求数、Token、估算费用、最近延迟与错误时间，可清零。
 - **备份与恢复**：导出 / 导入 JSON（会话、消息、Provider、模型、外观、用量），默认不含任何密钥。
@@ -64,6 +64,21 @@ pnpm preview      # 4318
 > 本机环境预设了 `ELECTRON_RUN_AS_NODE`，直接 `electron .` 会以 Node 模式退出。`desktop/launch.cjs` 会在子进程里清掉该变量；`desktop/start.cmd` 同样处理。
 >
 > 目前是**可运行的桌面壳**，尚未生成 `.exe` 安装包；需要分发时接 electron-builder（下一步）。
+
+## Android APK
+
+把同一套界面装进 WebView 外壳，可直接安装到手机（minSdk 24 / targetSdk 34），源码与构建脚本在 [`android/`](android/README.md)：
+
+- **状态栏跟随主题**：页面主题变化时通过 `SisqiHost.setChrome` 同步系统栏颜色与图标明暗
+- **加密凭据**：`SecretStore` 用 Android Keystore 加密，旧版 localStorage 里的明文密钥首次读取时自动迁移
+- **可配置模型**：手机「设置 → 模型与 API」可改 Base URL、写/清 API Key、连接测试、选默认模型
+- **绕过 CORS**：WebView 直连第三方端点会被拦（供应商不回 ACAO），对话与 `/models` 走 `SisqiHttp` 原生 HTTP 桥，SSE 逐行回吐，仍保持流式
+- **离线资源**：页面由 `shouldInterceptRequest` 直接读 assets（假域名 `https://appassets.local`），不依赖本地 HTTP 服务；只允许应用内导航，并禁用 WebView 缓存避免升级后跑到旧页面
+
+```bash
+npm run build                                   # 先构建 Web
+ANDROID_JAR=/path/android.jar DIST=../dist ./android/build.sh   # 产物 android/build/sisqi.apk
+```
 
 ## 信息架构
 
