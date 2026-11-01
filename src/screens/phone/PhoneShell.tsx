@@ -23,6 +23,7 @@ import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { PhoneModels } from './PhoneModels'
 import { connectors, skills, usage } from '../../data/work'
 import { modelLabel } from '../../lib/labels'
+import { deviceInfo, ramGb } from '../../lib/native-device'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -59,6 +60,7 @@ export function PhoneShell({
   const pendingList = approvals.filter((a) => a.status === 'PENDING')
   const pending = pendingList.length
   const phone = devices[0]
+  const info = deviceInfo()
   // 审批按钮：先切到有待审批的任务，再打开对话框；否则 ApprovalDialog 会因当前任务没有待审批项而空白
   const openApprovals = () => {
     const next = pendingList[0]
@@ -219,10 +221,26 @@ export function PhoneShell({
                 <span className="text-[13.5px] text-[var(--fg)]">设备</span>
                 <StatusPill label={deviceStatusLabel(phone.status)} tone="ok" className="ml-auto" />
               </div>
-              <p className="mt-1 text-[11.5px] text-[var(--faint)]">
-                {phone.model ?? '待检测'} · API {phone.androidApi ?? '待检测'} · 默认 Lite
-              </p>
-              <p className="text-[11.5px] text-[var(--faint)]">Root Provider 待检测 · 与平板独立授权</p>
+              {info ? (
+                <>
+                  <p className="mt-1 text-[11.5px] text-[var(--faint)]">
+                    {info.manufacturer} {info.model} · Android {info.android}（API {info.sdk}）
+                  </p>
+                  <p className="text-[11.5px] text-[var(--faint)]">
+                    {info.cores} 核 · {ramGb(info.totalRamMb)} 内存 · 可用 {ramGb(info.availRamMb)}
+                  </p>
+                  <p className="text-[11.5px] text-[var(--faint)]">
+                    ABI {info.abis.split(',')[0]} · su 二进制{info.suBinary ? '存在（应用内未申请 Root）' : '不可见'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-[11.5px] text-[var(--faint)]">
+                    {phone.model ?? '待检测'} · API {phone.androidApi ?? '待检测'} · 默认 Lite
+                  </p>
+                  <p className="text-[11.5px] text-[var(--faint)]">Root Provider 待检测 · 与平板独立授权</p>
+                </>
+              )}
             </section>
 
             <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">

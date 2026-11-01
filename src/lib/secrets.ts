@@ -14,6 +14,8 @@ interface NativeHost {
   setSecret?: (id: string, value: string) => boolean
   getSecret?: (id: string) => string
   deleteSecret?: (id: string) => void
+  deviceInfo?: () => string
+  pickFile?: (id: string, mime: string) => void
 }
 
 declare global {

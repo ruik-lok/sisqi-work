@@ -26,7 +26,7 @@ import {
   type Session,
   type ThemeMode,
 } from '../data/work'
-import { LlmError, streamChat, testProvider as probeProvider, type LlmMessage, type ReasoningEffort } from '../lib/llm'
+import { LlmError, streamChat, testProvider as probeProvider, type LlmContentPart, type LlmMessage, type ReasoningEffort } from '../lib/llm'
 import { maskKey, secretStore } from '../lib/secrets'
 
 export type { ThemeMode }
@@ -39,6 +39,11 @@ export const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; hint: string }
 
 export type Density = 'lite' | 'pro'
 export type { ReasoningEffort } from '../lib/llm'
+
+/** 待发送的附件：图片走多模态 image_url，文本文件拼进上下文 */
+export type NewAttachment =
+  | { kind: 'image'; name: string; dataUrl: string }
+  | { kind: 'text'; name: string; text: string }
 
 export interface ToastItem {
   id: number
@@ -111,7 +116,7 @@ interface Store {
   draft: string
   setDraft: (text: string) => void
   chatError: ChatError | null
-  sendMessage: (text: string) => void
+  sendMessage: (text: string, attachments?: NewAttachment[]) => void
   stopStreaming: () => void
   regenerate: () => void
   clearError: () => void
@@ -195,6 +200,22 @@ function loadState(): Partial<PersistShape> {
 }
 
 const initial = loadState()
+
+/** 把界面消息转成模型消息：文本附件拼进正文，图片转多模态 parts */
+function toLlmMessage(m: ChatMessage): LlmMessage {
+  const fileText = m.files?.length
+    ? '\n\n' + m.files.map((f) => `[附件 ${f.name}]\n\`\`\`\n${f.text ?? ''}\n\`\`\``).join('\n\n')
+    : ''
+  const text = (m.content + fileText).trim() || '请看这张图片'
+  if (m.role === 'user' && m.images?.length) {
+    const parts: LlmContentPart[] = [
+      { type: 'text', text },
+      ...m.images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+    ]
+    return { role: 'user', content: parts }
+  }
+  return { role: m.role === 'assistant' ? 'assistant' : 'user', content: text }
+}
 
 export function NexusProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
@@ -460,9 +481,9 @@ export function NexusProvider({ children }: { children: ReactNode }) {
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         // 演示模式的助手消息是本地脚本写的，会带偏真模型（它会模仿成"演示模式"），不送进上下文
         .filter((m) => m.mode !== 'demo')
-        .filter((m) => m.content.trim().length > 0)
+        .filter((m) => m.content.trim().length > 0 || Boolean(m.images?.length))
         .slice(-20)
-        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+        .map((m) => toLlmMessage(m))
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -538,15 +559,26 @@ export function NexusProvider({ children }: { children: ReactNode }) {
   )
 
   const sendMessage = useCallback(
-    (text: string) => {
+    (text: string, attachments?: NewAttachment[]) => {
       const trimmed = text.trim()
-      if (!trimmed || streaming) return
-      const userMsg: ChatMessage = { id: `u_${Date.now()}`, role: 'user', content: trimmed, time: clock() }
+      const images = (attachments ?? []).filter((a): a is Extract<NewAttachment, { kind: 'image' }> => a.kind === 'image').map((a) => a.dataUrl)
+      const files = (attachments ?? [])
+        .filter((a): a is Extract<NewAttachment, { kind: 'text' }> => a.kind === 'text')
+        .map((a) => ({ name: a.name, text: a.text }))
+      if ((!trimmed && !images.length) || streaming) return
+      const userMsg: ChatMessage = {
+        id: `u_${Date.now()}`,
+        role: 'user',
+        content: trimmed,
+        time: clock(),
+        images: images.length ? images : undefined,
+        files: files.length ? files : undefined,
+      }
       appendMessages(activeSessionId, [userMsg])
       touchSession(activeSessionId, {
         status: 'running',
-        preview: trimmed.slice(0, 36),
-        title: activeSession.title === '新会话' ? trimmed.slice(0, 24) : activeSession.title,
+        preview: trimmed.slice(0, 36) || (images.length ? '发送了图片' : files[0]?.name ?? ''),
+        title: activeSession.title === '新会话' ? trimmed.slice(0, 24) || (images.length ? '图片会话' : activeSession.title) : activeSession.title,
       })
       const history = [...messages, userMsg]
       void runTurn(history)

@@ -11,6 +11,8 @@
 ## 现在真的能用的功能
 
 - **真实模型对话**：支持任意 OpenAI 兼容端点（OpenAI、DeepSeek、自建网关…），SSE 流式输出，可停止、可重试、可切换模型。
+- **图片与文件附件**：系统文件选择器选图（APK 上无需存储权限），图片以多模态 `image_url` 发给 V4.1-Flash；文本文件内容拼进模型上下文，界面只显示文件气泡。
+- **真实设备信息**：APK 通过原生桥读取机型、Android 版本/API、CPU 核数、内存与 ABI，设置页不再显示「待检测」。
 - **深度思考**：V4.1 的 `reasoning_effort`（低 / 高 / 最高）可在输入框旁切换并真实下发；思考过程（`reasoning_content`）流式展示为可折叠灰块，回答结束后自动收起。
 - **模型与 API 管理**：添加 / 编辑 / 删除 Provider，保存或清除 API Key，真实连接测试并自动拉取模型列表，添加 / 删除模型，设置默认模型。
 - **密钥安全**：桌面版用 Electron `safeStorage` 加密落盘（`secrets.json`，已验证不含明文）；APK 用 Android Keystore（AES-256-GCM，`SharedPreferences` 里只有密文）；Web 预览退回本机 localStorage。界面始终只显示掩码。
@@ -74,6 +76,7 @@ pnpm preview      # 4318
 - **加密凭据**：`SecretStore` 用 Android Keystore 加密，旧版 localStorage 里的明文密钥首次读取时自动迁移
 - **可配置模型**：手机「设置 → 模型与 API」可改 Base URL、写/清 API Key、连接测试、选默认模型
 - **绕过 CORS**：WebView 直连第三方端点会被拦（供应商不回 ACAO），对话与 `/models` 走 `SisqiHttp` 原生 HTTP 桥，SSE 逐行回吐，仍保持流式
+- **图片输入**：系统 SAF 选择器（`ACTION_GET_CONTENT`）→ data URL → 多模态 `image_url`；文本附件拼进上下文；图片上限 1.5 MB
 - **离线资源**：页面由 `shouldInterceptRequest` 直接读 assets（假域名 `https://appassets.local`），不依赖本地 HTTP 服务；只允许应用内导航，并禁用 WebView 缓存避免升级后跑到旧页面
 
 ```bash

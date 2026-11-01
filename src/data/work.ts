@@ -28,6 +28,10 @@ export interface ChatMessage {
   streaming?: boolean
   /** 深度思考（V4.1 的 reasoning_content），只用于展示 */
   reasoning?: string
+  /** 图片附件（data URL），随消息一起发给多模态模型 */
+  images?: string[]
+  /** 文本附件（内容会拼进模型上下文，界面只显示文件名） */
+  files?: Array<{ name: string; text?: string }>
   mode?: 'demo' | 'live'
 }
 

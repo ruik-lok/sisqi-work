@@ -1,7 +1,14 @@
 package com.sisqi.work;
 
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.content.Intent;
 import android.content.res.Configuration;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
+import android.text.TextUtils;
+import android.util.Base64;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -25,10 +32,13 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import org.json.JSONObject;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,6 +46,8 @@ public class MainActivity extends Activity {
     private static final String TAG = "SISQI";
     private static final String ORIGIN = "https://appassets.local";
     private static final boolean DEBUG_AUDIT = true;
+    private static final int REQ_PICK = 4711;
+    private String pickId;
     private WebView web;
     private SecretStore secrets;
     private volatile boolean finished = false;
@@ -174,6 +186,125 @@ public class MainActivity extends Activity {
         public void deleteSecret(String id) {
             secrets.delete(id);
         }
+
+        /** 真实设备信息（设置页展示，替代"待检测"） */
+        @JavascriptInterface
+        public String deviceInfo() {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("model", Build.MODEL);
+                o.put("brand", Build.BRAND);
+                o.put("manufacturer", Build.MANUFACTURER);
+                o.put("android", Build.VERSION.RELEASE);
+                o.put("sdk", Build.VERSION.SDK_INT);
+                o.put("abis", TextUtils.join(",", Build.SUPPORTED_ABIS));
+                o.put("cores", Runtime.getRuntime().availableProcessors());
+                ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+                ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+                if (am != null) {
+                    am.getMemoryInfo(mi);
+                    o.put("totalRamMb", mi.totalMem / (1024 * 1024));
+                    o.put("availRamMb", mi.availMem / (1024 * 1024));
+                }
+                o.put("suBinary", new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists());
+                return o.toString();
+            } catch (Exception e) {
+                Log.w(TAG, "deviceInfo failed: " + e);
+                return "{}";
+            }
+        }
+
+        /** 系统文件选择器：图片给 dataUrl，文本给 text（沙盒内安全读取，不需要存储权限） */
+        @JavascriptInterface
+        public void pickFile(String id, String mime) {
+            pickId = id;
+            try {
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType(mime == null || mime.isEmpty() ? "*/*" : mime);
+                startActivityForResult(Intent.createChooser(i, "选择文件"), REQ_PICK);
+            } catch (Exception e) {
+                Log.w(TAG, "pickFile failed: " + e);
+                emitFile(id, "null");
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_PICK) return;
+        String id = pickId;
+        pickId = null;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            emitFile(id, "null");
+            return;
+        }
+        Uri uri = data.getData();
+        try {
+            String name = null;
+            long size = -1;
+            String mime = getContentResolver().getType(uri);
+            Cursor c = getContentResolver().query(uri, null, null, null, null);
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    int ni = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    int si = c.getColumnIndex(OpenableColumns.SIZE);
+                    if (ni >= 0) name = c.getString(ni);
+                    if (si >= 0 && !c.isNull(si)) size = c.getLong(si);
+                }
+                c.close();
+            }
+            JSONObject o = new JSONObject();
+            o.put("name", name == null ? "file" : name);
+            o.put("mime", mime == null ? "application/octet-stream" : mime);
+            o.put("size", size);
+
+            if (mime != null && mime.startsWith("image/")) {
+                if (size > 1536L * 1024) {
+                    o.put("tooLarge", true);
+                } else {
+                    byte[] bytes = readBytes(uri);
+                    o.put("dataUrl", "data:" + mime + ";base64," + Base64.encodeToString(bytes, Base64.NO_WRAP));
+                }
+            } else if (isTextLike(mime) && size <= 512L * 1024) {
+                byte[] bytes = readBytes(uri);
+                o.put("text", new String(bytes, StandardCharsets.UTF_8));
+            }
+            emitFile(id, o.toString());
+        } catch (Exception e) {
+            Log.w(TAG, "read picked file failed: " + e);
+            emitFile(id, "null");
+        }
+    }
+
+    private static boolean isTextLike(String mime) {
+        if (mime == null) return false;
+        return mime.startsWith("text/") || mime.contains("json") || mime.contains("xml") || mime.contains("javascript") || mime.contains("yaml");
+    }
+
+    private byte[] readBytes(Uri uri) throws IOException {
+        InputStream is = getContentResolver().openInputStream(uri);
+        if (is == null) throw new IOException("no stream");
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+        is.close();
+        return bos.toByteArray();
+    }
+
+    private void emitFile(String id, String json) {
+        if (id == null) return;
+        final String js = "window.__sisqiFile&&window.__sisqiFile(" + JSONObject.quote(id) + "," + json + ")";
+        runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    if (web != null) web.evaluateJavascript(js, null);
+                } catch (Exception ignore) {
+                }
+            }
+        });
     }
 
     private boolean systemInNightMode() {

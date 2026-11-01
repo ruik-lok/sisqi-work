@@ -19,13 +19,15 @@ import {
   Square,
   Trash2,
   Wrench,
+  X,
 } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { Badge, Button, IconButton, Meter, StatusPill, taskTone } from '../ui/primitives'
 import { Dialog, Menu, MenuItem } from '../ui/overlays'
 import { WorkMark } from '../brand/Mark'
 import { MarkdownText } from './Markdown'
-import { useNexus } from '../../state/store'
+import { useNexus, type NewAttachment } from '../../state/store'
+import { pickFile } from '../../lib/native-files'
 import type { ReasoningEffort } from '../../lib/llm'
 import { modelLabel } from '../../lib/labels'
 
@@ -293,8 +295,25 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
           if (m.role === 'user') {
             return (
               <div key={m.id} className="flex justify-end">
-                <div className={cn('wrap-any max-w-[82%] min-w-0 rounded-[20px] rounded-br-[8px] bg-[var(--bubble)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--fg)]', dense && 'text-[14px]')}>
-                  {m.content}
+                <div className={cn('max-w-[82%] min-w-0 space-y-2 rounded-[20px] rounded-br-[8px] bg-[var(--bubble)] px-3.5 py-2.5 text-[15px] leading-relaxed text-[var(--fg)]', dense && 'text-[14px]')}>
+                  {m.images?.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.images.map((src, i) => (
+                        <img key={i} src={src} alt="附件图片" className="max-h-[180px] rounded-[12px] object-cover" />
+                      ))}
+                    </div>
+                  ) : null}
+                  {m.files?.length ? (
+                    <div className="flex flex-wrap gap-1">
+                      {m.files.map((f, i) => (
+                        <span key={i} className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-[8px] bg-[var(--surface)]/70 px-2 py-1 font-mono text-[11px] text-[var(--muted)]">
+                          <Paperclip size={10} className="shrink-0" />
+                          {f.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {m.content ? <div className="wrap-any whitespace-pre-wrap">{m.content}</div> : null}
                 </div>
               </div>
             )
@@ -397,13 +416,42 @@ export function ChatErrorBanner({ onOpenSettings }: { onOpenSettings: () => void
 export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; onOpenSettings: () => void }) {
   const { sendMessage, streaming, stopStreaming, modelId, setModelId, models, providers, demoMode, toast, draft, setDraft, effort, setEffort } = useNexus()
   const ta = useRef<HTMLTextAreaElement>(null)
+  const [attachments, setAttachments] = useState<NewAttachment[]>([])
   const model = models.find((m) => m.id === modelId) ?? models[0]
   const provider = providers.find((p) => p.id === model?.providerId)
 
+  const canSend = Boolean(draft.trim()) || attachments.length > 0
+
   const send = () => {
-    if (!draft.trim() || streaming) return
-    sendMessage(draft)
+    if (!canSend || streaming) return
+    sendMessage(draft, attachments)
     setDraft('')
+    setAttachments([])
+  }
+
+  const pick = async () => {
+    try {
+      const file = await pickFile()
+      if (!file) return
+      if (file.tooLarge) {
+        toast({ title: '图片太大', detail: `${file.name} 超过 1.5 MB，先压缩或裁剪再发`, tone: 'warn' })
+        return
+      }
+      if (file.dataUrl) {
+        if (attachments.filter((a) => a.kind === 'image').length >= 4) {
+          toast({ title: '最多 4 张图片', detail: '分批发送更稳妥', tone: 'warn' })
+          return
+        }
+        setAttachments((prev) => [...prev, { kind: 'image', name: file.name, dataUrl: file.dataUrl! }])
+      } else if (typeof file.text === 'string') {
+        const text = file.text.slice(0, 65536)
+        setAttachments((prev) => [...prev, { kind: 'text', name: file.name, text }])
+      } else {
+        toast({ title: '暂不支持这个类型', detail: `${file.name} · ${file.mime}`, tone: 'warn' })
+      }
+    } catch {
+      toast({ title: '打开文件选择器失败', tone: 'danger' })
+    }
   }
 
   // 输入框随内容长高（最多 10rem），避免长文本只能在小窗里滚动
@@ -427,6 +475,27 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
           </div>
         )}
         <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-1)] transition-shadow focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-8)]">
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+              {attachments.map((a, i) => (
+                <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--muted)]">
+                  {a.kind === 'image' ? (
+                    <img src={a.dataUrl} alt="" className="size-5 rounded-[4px] object-cover" />
+                  ) : (
+                    <Paperclip size={11} />
+                  )}
+                  <span className="max-w-[130px] truncate">{a.name}</span>
+                  <button
+                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label={`移除附件 ${a.name}`}
+                    className="text-[var(--faint)] hover:text-[var(--fg)]"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <textarea
             ref={ta}
             value={draft}
@@ -498,7 +567,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
                 </>
               )}
             </Menu>
-            <IconButton label="添加附件" size="sm" onClick={() => toast({ title: '附件入口', detail: '当前支持文本与文件引用，图片稍后接入', tone: 'neutral' })}>
+            <IconButton label="添加附件" size="sm" onClick={() => void pick()}>
               <Paperclip size={15} />
             </IconButton>
             <Menu
@@ -556,9 +625,9 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
             ) : (
               <Button
                 size="sm"
-                variant={draft.trim() ? 'primary' : 'quiet'}
+                variant={canSend ? 'primary' : 'quiet'}
                 onClick={send}
-                disabled={!draft.trim()}
+                disabled={!canSend}
                 aria-label="发送消息"
                 className="!h-9 !w-9 !rounded-full !px-0 disabled:opacity-100"
               >

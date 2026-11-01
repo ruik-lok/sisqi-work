@@ -8,9 +8,14 @@
 
 import { nativeHttpAvailable, nativeRequest, streamNative } from './native-http'
 
+export type LlmContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  /** 纯文本，或多模态 parts（文本 + 图片 data URL） */
+  content: string | LlmContentPart[]
 }
 
 export type ReasoningEffort = 'low' | 'high' | 'max'
