@@ -133,29 +133,36 @@ public class HudService extends Service {
         running = true;
         Thread t = new Thread(new Runnable() {
             public void run() {
-                try {
-                    server = new ServerSocket(PORT, 8, InetAddress.getByName("127.0.0.1"));
-                    while (running) {
-                        final Socket s = server.accept();
-                        // 每个连接单独线程 + 读超时：避免一个半开连接把 accept 循环卡死
-                        new Thread(new Runnable() {
-                            public void run() {
-                                try {
-                                    s.setSoTimeout(5000);
-                                    handle(s);
-                                } catch (Exception e) {
-                                    Log.w("HUD", "handle: " + e);
-                                } finally {
-                                    try {
-                                        s.close();
-                                    } catch (Exception ignore) {
-                                    }
-                                }
+                while (running) {
+                    try {
+                        if (server == null || server.isClosed()) {
+                            server = new ServerSocket(PORT, 16, InetAddress.getByName("127.0.0.1"));
+                            server.setReuseAddress(true);
+                        }
+                        Socket s = server.accept();
+                        try {
+                            s.setSoTimeout(3000);
+                            handle(s);
+                        } catch (Throwable e) {
+                            Log.w("HUD", "handle: " + e);
+                        } finally {
+                            try {
+                                s.close();
+                            } catch (Exception ignore) {
                             }
-                        }, "hud-conn").start();
+                        }
+                    } catch (Throwable e) {
+                        Log.w("HUD", "server loop: " + e);
+                        try {
+                            if (server != null) server.close();
+                        } catch (Exception ignore) {
+                        }
+                        server = null;
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException ignore) {
+                        }
                     }
-                } catch (Exception e) {
-                    Log.w("HUD", "server: " + e);
                 }
             }
         }, "hud-http");
