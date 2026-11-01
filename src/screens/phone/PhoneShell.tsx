@@ -134,7 +134,23 @@ export function PhoneShell({
 
         {route === 'connectors' && (
           <div className="h-full overflow-y-auto px-4 py-3">
-            <div className="space-y-2">
+            <button
+              onClick={() => setSkillsOpen(true)}
+              className="flex w-full items-center gap-2.5 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] text-[var(--faint)]">
+                <Wrench size={15} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] text-[var(--fg)]">技能与 MCP</span>
+                <span className="block text-[11px] text-[var(--faint)]">
+                  {Object.values(skillState).filter(Boolean).length}/{skills.length} 个技能启用 · 3 个 MCP Server
+                </span>
+              </span>
+              <ChevronRight size={15} className="shrink-0 text-[var(--faint)]" />
+            </button>
+
+            <div className="mt-2 space-y-2">
               {connectors.slice(0, 6).map((c) => (
                 <div key={c.id} className="flex items-center gap-2.5 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
                   <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] text-[var(--muted)]">
@@ -151,9 +167,6 @@ export function PhoneShell({
                 </div>
               ))}
             </div>
-            <Button size="sm" variant="secondary" block className="mt-3" icon={<Wrench size={14} />} onClick={() => setSkillsOpen(true)}>
-              管理技能与 MCP
-            </Button>
           </div>
         )}
 
