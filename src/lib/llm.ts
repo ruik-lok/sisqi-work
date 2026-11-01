@@ -13,13 +13,19 @@ export interface LlmMessage {
   content: string
 }
 
+export type ReasoningEffort = 'low' | 'high' | 'max'
+
 export interface StreamOptions {
   baseUrl: string
   apiKey: string
   model: string
   messages: LlmMessage[]
   signal?: AbortSignal
+  /** 深度思考强度（V4.1 的 reasoning_effort），不传则由服务端用默认值 */
+  reasoningEffort?: ReasoningEffort
   onDelta: (text: string) => void
+  /** 思考过程增量（reasoning_content） */
+  onReasoning?: (text: string) => void
   onUsage?: (usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number }) => void
 }
 
@@ -120,6 +126,7 @@ export async function streamChat(opts: StreamOptions): Promise<{ text: string; u
         messages: opts.messages,
         stream: true,
         stream_options: { include_usage: true },
+        ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
       }),
       signal: opts.signal,
     })
@@ -167,6 +174,7 @@ export async function streamChat(opts: StreamOptions): Promise<{ text: string; u
         const payload = trimmed.slice(5).trim()
         if (!payload || payload === '[DONE]') continue
         const parsed = parseChunk(payload)
+        if (parsed.reasoning) opts.onReasoning?.(parsed.reasoning)
         if (parsed.delta) {
           text += parsed.delta
           opts.onDelta(parsed.delta)
@@ -184,17 +192,18 @@ export async function streamChat(opts: StreamOptions): Promise<{ text: string; u
 
 type Usage = { promptTokens?: number; completionTokens?: number; totalTokens?: number }
 
-function parseChunk(payload: string): { delta?: string; usage?: Usage } {
+function parseChunk(payload: string): { delta?: string; reasoning?: string; usage?: Usage } {
   try {
     const json = JSON.parse(payload) as {
-      choices?: Array<{ delta?: { content?: string } }>
+      choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>
       usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
     }
     const delta = json.choices?.[0]?.delta?.content
+    const reasoning = json.choices?.[0]?.delta?.reasoning_content
     const usage = json.usage
       ? { promptTokens: json.usage.prompt_tokens, completionTokens: json.usage.completion_tokens, totalTokens: json.usage.total_tokens }
       : undefined
-    return { delta, usage }
+    return { delta, reasoning, usage }
   } catch {
     return {}
   }
@@ -207,6 +216,7 @@ async function streamChatNative(opts: StreamOptions): Promise<{ text: string; us
     messages: opts.messages,
     stream: true,
     stream_options: { include_usage: true },
+    ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
   })
 
   let text = ''
@@ -221,6 +231,7 @@ async function streamChatNative(opts: StreamOptions): Promise<{ text: string; us
       onData: (payload) => {
         if (!payload || payload === '[DONE]') return
         const parsed = parseChunk(payload)
+        if (parsed.reasoning) opts.onReasoning?.(parsed.reasoning)
         if (parsed.delta) {
           text += parsed.delta
           opts.onDelta(parsed.delta)

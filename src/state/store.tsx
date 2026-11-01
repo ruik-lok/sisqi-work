@@ -26,7 +26,7 @@ import {
   type Session,
   type ThemeMode,
 } from '../data/work'
-import { LlmError, streamChat, testProvider as probeProvider, type LlmMessage } from '../lib/llm'
+import { LlmError, streamChat, testProvider as probeProvider, type LlmMessage, type ReasoningEffort } from '../lib/llm'
 import { maskKey, secretStore } from '../lib/secrets'
 
 export type { ThemeMode }
@@ -38,6 +38,7 @@ export const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; hint: string }
 ]
 
 export type Density = 'lite' | 'pro'
+export type { ReasoningEffort } from '../lib/llm'
 
 export interface ToastItem {
   id: number
@@ -74,6 +75,7 @@ interface PersistShape {
   version: 2
   theme: ThemeMode
   density: Density
+  effort?: ReasoningEffort
   modelId: string
   sessions: Session[]
   messages: Record<string, ChatMessage[]>
@@ -87,6 +89,9 @@ interface Store {
   theme: ThemeMode
   resolvedTheme: 'light' | 'dark'
   setTheme: (t: ThemeMode) => void
+  /** 深度思考强度 */
+  effort: ReasoningEffort
+  setEffort: (e: ReasoningEffort) => void
   density: Density
   setDensity: (d: Density) => void
 
@@ -198,6 +203,11 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     return candidate === 'light' || candidate === 'dark' || candidate === 'system' ? candidate : 'dark'
   })
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const [effort, setEffort] = useState<ReasoningEffort>(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('effort') as ReasoningEffort | null
+    const candidate = fromUrl ?? initial.effort ?? 'high'
+    return candidate === 'low' || candidate === 'high' || candidate === 'max' ? candidate : 'high'
+  })
   const [density, setDensityState] = useState<Density>(() => (new URLSearchParams(window.location.search).get('ui') as Density | null) ?? initial.density ?? 'pro')
 
   const [sessionList, setSessionList] = useState<Session[]>(() => {
@@ -312,6 +322,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       version: 2,
       theme,
       density,
+      effort,
       modelId,
       sessions: sessionList,
       messages: messagesMap,
@@ -327,7 +338,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       }
     }, 250)
     return () => window.clearTimeout(t)
-  }, [theme, density, modelId, sessionList, messagesMap, providers, modelList, usage])
+  }, [theme, density, effort, modelId, sessionList, messagesMap, providers, modelList, usage])
 
   const toast = useCallback((t: Omit<ToastItem, 'id'>) => {
     const id = toastSeq.current++
@@ -461,6 +472,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       appendMessages(activeSessionId, [{ id: assistantId, role: 'assistant', content: '', time: clock(), streaming: true, mode: 'live' }])
 
       let text = ''
+      let reasoning = ''
       let usageInfo: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined
 
       try {
@@ -470,6 +482,12 @@ export function NexusProvider({ children }: { children: ReactNode }) {
           model: activeModel.name,
           messages: llmMessages,
           signal: controller.signal,
+          // 只有带推理能力的模型才发 reasoning_effort，避免别的网关 400
+          reasoningEffort: activeModel.capabilities.includes('推理') ? effort : undefined,
+          onReasoning: (delta) => {
+            reasoning += delta
+            patchMessage(activeSessionId, assistantId, { reasoning })
+          },
           onDelta: (delta) => {
             text += delta
             patchMessage(activeSessionId, assistantId, { content: text })
@@ -516,7 +534,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
         setStreaming(false)
       }
     },
-    [activeModel, activeSessionId, appendMessages, patchMessage, providers, toast, touchSession],
+    [activeModel, activeSessionId, appendMessages, effort, patchMessage, providers, toast, touchSession],
   )
 
   const sendMessage = useCallback(
@@ -773,6 +791,8 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       theme,
       resolvedTheme,
       setTheme: setThemeState,
+      effort,
+      setEffort,
       density,
       setDensity: setDensityState,
       sessions: sessionList,
@@ -844,6 +864,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     deleteSession,
     density,
     dismissToast,
+    effort,
     exportData,
     hasApiKey,
     importData,

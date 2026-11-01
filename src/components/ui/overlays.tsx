@@ -314,6 +314,7 @@ export function Menu({
   side = 'auto',
   label,
   width = 'w-60',
+  className,
 }: {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode
   children: ReactNode | ((close: () => void) => ReactNode)
@@ -321,6 +322,8 @@ export function Menu({
   side?: 'auto' | 'top' | 'bottom'
   label: string
   width?: string
+  /** 外层容器的额外类名（例如 shrink-0，避免放进 flex 行时被压扁） */
+  className?: string
 }) {
   const root = useOverlayRoot()
   const [open, setOpen] = useState(false)
@@ -402,7 +405,7 @@ export function Menu({
 
   const close = () => setOpen(false)
   return (
-    <div ref={wrap} className="relative">
+    <div ref={wrap} className={cn('relative', className)}>
       {trigger({ open, toggle: () => setOpen((v) => !v) })}
       {open &&
         createPortal(

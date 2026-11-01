@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  Sparkles,
   Square,
   Trash2,
   Wrench,
@@ -25,6 +26,7 @@ import { Dialog, Menu, MenuItem } from '../ui/overlays'
 import { WorkMark } from '../brand/Mark'
 import { MarkdownText } from './Markdown'
 import { useNexus } from '../../state/store'
+import type { ReasoningEffort } from '../../lib/llm'
 import { modelLabel } from '../../lib/labels'
 
 
@@ -211,6 +213,38 @@ export function SessionList({ onOpenSettings }: { onOpenSettings?: () => void })
 
 /* ------------------------------------------------------------------- thread */
 
+const EFFORTS: Array<{ value: ReasoningEffort; label: string; hint: string }> = [
+  { value: 'low', label: '低', hint: '更快' },
+  { value: 'high', label: '高', hint: '默认' },
+  { value: 'max', label: '最高', hint: '更深' },
+]
+
+function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
+  const [open, setOpen] = useState(live)
+  useEffect(() => {
+    setOpen(live)
+  }, [live])
+  return (
+    <div className="mb-2 overflow-hidden rounded-[14px] bg-[var(--surface-2)]">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 px-3 py-2 text-[12px] text-[var(--muted)]"
+      >
+        <Sparkles size={12} className={cn(live && 'text-[var(--accent)] anim-pulse')} />
+        <span>{live ? '正在深度思考…' : '已深度思考'}</span>
+        <span className="text-[11px] text-[var(--faint)]">{text.length} 字</span>
+        <ChevronDown size={13} className={cn('ml-auto transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <p className="wrap-any max-h-[260px] overflow-y-auto whitespace-pre-wrap border-t border-[var(--line)] px-3 py-2 text-[12.5px] leading-relaxed text-[var(--faint)]">
+          {text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const EMPTY_SUGGESTIONS = ['帮我写一段 TypeScript 代码', '把这段话润色得更专业', '解释一下这个报错']
 
 export function ChatThread({ dense = false }: { dense?: boolean }) {
@@ -291,8 +325,9 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
                   {m.streaming && <span className="text-[11px] text-[var(--accent)]">生成中…</span>}
                   {m.mode === 'demo' && !m.streaming && <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10.5px] text-[var(--faint)]">演示</span>}
                 </div>
+                {m.reasoning && <ThinkingBlock text={m.reasoning} live={Boolean(m.streaming) && !m.content} />}
                 <div className={cn('mt-1 text-[15px] leading-[1.75] text-[var(--fg)]', dense && 'text-[14.5px]')}>
-                  {m.content ? <MarkdownText text={m.content} /> : m.streaming ? <span className="text-[var(--faint)]">正在思考…</span> : null}
+                  {m.content ? <MarkdownText text={m.content} /> : m.streaming && !m.reasoning ? <span className="text-[var(--faint)]">正在思考…</span> : null}
                   {m.streaming && <span className="ml-0.5 mt-1 inline-block h-4 w-[2px] bg-[var(--accent)] anim-pulse" />}
                 </div>
 
@@ -360,7 +395,7 @@ export function ChatErrorBanner({ onOpenSettings }: { onOpenSettings: () => void
 /* ------------------------------------------------------------------- composer */
 
 export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; onOpenSettings: () => void }) {
-  const { sendMessage, streaming, stopStreaming, modelId, setModelId, models, providers, demoMode, toast, draft, setDraft } = useNexus()
+  const { sendMessage, streaming, stopStreaming, modelId, setModelId, models, providers, demoMode, toast, draft, setDraft, effort, setEffort } = useNexus()
   const ta = useRef<HTMLTextAreaElement>(null)
   const model = models.find((m) => m.id === modelId) ?? models[0]
   const provider = providers.find((p) => p.id === model?.providerId)
@@ -415,6 +450,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
               align="left"
               side="top"
               width="w-64"
+              className="shrink-0"
               trigger={({ toggle, open }) => (
                 <button
                   onClick={toggle}
@@ -423,7 +459,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
                   className="inline-flex h-8 items-center gap-1.5 rounded-[10px] px-2 text-[12.5px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
                 >
                   <span className={cn('size-1.5 rounded-full', demoMode ? 'bg-[var(--warn)]' : 'bg-[var(--ok)]')} />
-                  <span className="max-w-[140px] truncate font-mono">{model ? modelLabel(model) : '未选择模型'}</span>
+                  <span className="max-w-[132px] truncate font-mono">{model ? modelLabel(model) : '未选择模型'}</span>
                   <ChevronDown size={12} />
                 </button>
               )}
@@ -465,12 +501,53 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
             <IconButton label="添加附件" size="sm" onClick={() => toast({ title: '附件入口', detail: '当前支持文本与文件引用，图片稍后接入', tone: 'neutral' })}>
               <Paperclip size={15} />
             </IconButton>
-            <IconButton label="工具与执行模式" size="sm" onClick={() => toast({ title: '执行模式', detail: '只读 / 自动执行 / 每步批准', tone: 'neutral' })}>
-              <Wrench size={15} />
-            </IconButton>
-            <span className="ml-auto pr-1 text-[11px] text-[var(--faint)]" title="Enter 发送，Shift+Enter 换行" aria-hidden="true">
-              <CornerDownLeft size={12} />
-            </span>
+            <Menu
+              label="深度思考强度"
+              align="left"
+              side="top"
+              width="w-56"
+              className="shrink-0"
+              trigger={({ toggle, open }) => (
+                <button
+                  onClick={toggle}
+                  aria-expanded={open}
+                  aria-label="深度思考强度"
+                  className={cn(
+                    'inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] transition-colors',
+                    effort === 'low' ? 'text-[var(--muted)] hover:bg-[var(--surface-2)]' : 'bg-[var(--accent-soft)] text-[var(--accent)]',
+                  )}
+                >
+                  <Sparkles size={13} />
+                  <span>思考·{EFFORTS.find((e) => e.value === effort)?.label ?? '高'}</span>
+                </button>
+              )}
+            >
+              {(close) => (
+                <>
+                  <p className="label px-2 py-1">深度思考强度</p>
+                  {EFFORTS.map((e) => (
+                    <MenuItem
+                      key={e.value}
+                      selected={effort === e.value}
+                      hint={e.hint}
+                      onSelect={() => {
+                        setEffort(e.value)
+                        close()
+                      }}
+                    >
+                      {e.label}
+                    </MenuItem>
+                  ))}
+                  <p className="px-2 py-1 text-[11px] leading-relaxed text-[var(--faint)]">仅对支持推理的模型生效</p>
+                </>
+              )}
+            </Menu>
+            {!dense && (
+              <span className="ml-auto pr-1 text-[11px] text-[var(--faint)]" title="Enter 发送，Shift+Enter 换行" aria-hidden="true">
+                <CornerDownLeft size={12} />
+              </span>
+            )}
+            {dense && <span className="ml-auto" />}
             {streaming ? (
               <Button size="sm" variant="secondary" onClick={stopStreaming} aria-label="停止生成" className="!h-8 !px-2">
                 <Square size={13} />

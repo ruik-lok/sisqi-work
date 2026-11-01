@@ -26,6 +26,8 @@ export interface ChatMessage {
   time: string
   tools?: Array<{ name: string; detail: string; state: 'done' | 'running' | 'blocked' }>
   streaming?: boolean
+  /** 深度思考（V4.1 的 reasoning_content），只用于展示 */
+  reasoning?: string
   mode?: 'demo' | 'live'
 }
 

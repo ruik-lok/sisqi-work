@@ -11,6 +11,7 @@
 ## 现在真的能用的功能
 
 - **真实模型对话**：支持任意 OpenAI 兼容端点（OpenAI、DeepSeek、自建网关…），SSE 流式输出，可停止、可重试、可切换模型。
+- **深度思考**：V4.1 的 `reasoning_effort`（低 / 高 / 最高）可在输入框旁切换并真实下发；思考过程（`reasoning_content`）流式展示为可折叠灰块，回答结束后自动收起。
 - **模型与 API 管理**：添加 / 编辑 / 删除 Provider，保存或清除 API Key，真实连接测试并自动拉取模型列表，添加 / 删除模型，设置默认模型。
 - **密钥安全**：桌面版用 Electron `safeStorage` 加密落盘（`secrets.json`，已验证不含明文）；APK 用 Android Keystore（AES-256-GCM，`SharedPreferences` 里只有密文）；Web 预览退回本机 localStorage。界面始终只显示掩码。
 - **会话与消息持久化**：刷新、重启后会话与消息仍在；支持新建、重命名、置顶、删除、搜索。
@@ -111,7 +112,7 @@ Lite / Pro 共用同一 store 与路由，切换不重置会话、任务与界�
 - **主题**：Arctic（亮，白底 + DeepSeek 蓝 #4D6BFE）/ Midnight（暗，近黑中性底 + #7D93FF），两套完整 Token；System 监听系统偏好。
 - **表面**：白/近黑底 + 柔和灰面（surface-2）+ 极淡描边，几乎不用硬边框；全站无 `backdrop-blur`。
 - **字体**：系统中文（苹方 / HarmonyOS Sans / MiSans / Noto Sans SC）+ Inter + JetBrains Mono；字号 11/12/13/14/15/16/17/20。
-- **对话**：用户消息浅蓝气泡右对齐，助手纯文本 + 轻量 Markdown（代码块 / 列表 / 粗体 / 行内代码 / 链接）；空状态给三个建议胶囊。
+- **对话**：用户消息浅蓝气泡右对齐，助手纯文本 + 轻量 Markdown（代码块 / 列表 / 粗体 / 行内代码 / 链接）；深度思考过程折叠成灰块；空状态给三个建议胶囊。
 - **间距与圆角**：4dp 基准；按钮 10–12px，卡片 18px，输入框 24px，弹层 26px。
 - **状态**：颜色 + 文字双通道；`待检测` 保留 null 语义，不按型号推断。
 - **动效**：150–280ms；`prefers-reduced-motion` 全量关闭。
