@@ -7,6 +7,8 @@ import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.View;
@@ -27,6 +29,8 @@ public class GlassPill extends TextView {
     private final Paint gloss = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path glossPath = new Path();
+    private Bitmap noise;
+    private final Paint noisePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public GlassPill(Context c) {
         super(c);
@@ -43,6 +47,18 @@ public class GlassPill extends TextView {
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(dp(1));
         gloss.setStyle(Paint.Style.FILL);
+
+        // 磨砂颗粒：64x64 随机噪声贴图，平铺后叠一层极淡的噪点
+        int n = 64;
+        noise = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888);
+        java.util.Random rnd = new java.util.Random(7);
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                int v = 128 + rnd.nextInt(96) - 48;
+                noise.setPixel(x, y, Color.argb(14, v, v, v));
+            }
+        }
+        noisePaint.setShader(new BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT));
     }
 
     @Override
@@ -56,12 +72,15 @@ public class GlassPill extends TextView {
         // 1) 玻璃底：上亮下暗的半透明白
         // 深色玻璃：在浅色/深色背景上都看得清；顶部略亮，底部更沉
         fill.setShader(new LinearGradient(0, 0, 0, h,
-                Color.argb(168, 20, 22, 30),
-                Color.argb(206, 12, 13, 18),
+                Color.argb(205, 26, 28, 36),
+                Color.argb(238, 16, 17, 22),
                 Shader.TileMode.CLAMP));
         fill.setShadowLayer(dp(10), 0, dp(3), Color.argb(90, 0, 0, 0));
         canvas.drawRoundRect(rect, r, r, fill);
         fill.clearShadowLayer();
+
+        // 1.5) 磨砂颗粒
+        canvas.drawRoundRect(rect, r, r, noisePaint);
 
         // 2) 顶部高光弧（模拟玻璃折射的亮边）
         gloss.setShader(new LinearGradient(0, 0, 0, h * 0.55f,

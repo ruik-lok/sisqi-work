@@ -135,14 +135,24 @@ public class HudService extends Service {
         }
 
         android.content.SharedPreferences sp = getSharedPreferences("hud", MODE_PRIVATE);
+        // 布局版本升级：清掉旧位置，首次默认水平居中、贴状态栏下方
+        boolean centerOnce = sp.getInt("layoutV", 1) < 3;
+        if (centerOnce) {
+            sp.edit().putInt("layoutV", 3).remove("x").remove("y").apply();
+        }
         pillX = sp.getInt("x", 24);
-        pillY = sp.getInt("y", 300);
-        if (pillY < 240) pillY = 300;
+        pillY = sp.getInt("y", 140);
+        if (pillY < 100) pillY = 140;
 
         pill = new GlassPill(this);
         pill.setTextColor(Color.WHITE);
-        pill.setTextSize(12);
-        pill.setPadding(dp(12), dp(7), dp(12), dp(7));
+        pill.setTextSize(12.5f);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setIncludeFontPadding(false);
+        pill.setSingleLine(true);
+        pill.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        pill.setMaxWidth((int) (getResources().getDisplayMetrics().widthPixels * 0.72f));
+        pill.setPadding(dp(12), dp(9), dp(14), dp(9));
         pill.setBackground(null);
         pill.setShadowLayer(0, 0, 0, 0);
         pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stat, 0, 0, 0);
@@ -162,6 +172,22 @@ public class HudService extends Service {
             wm.addView(pill, pillParams);
         } catch (Exception e) {
             Log.w("HUD", "add pill: " + e);
+        }
+        if (centerOnce) {
+            final boolean center = true;
+            pill.post(new Runnable() {
+                public void run() {
+                    int sw = getResources().getDisplayMetrics().widthPixels;
+                    int w = pill.getWidth();
+                    if (w > 0 && sw > w) {
+                        pillParams.x = (sw - w) / 2;
+                        try {
+                            wm.updateViewLayout(pill, pillParams);
+                        } catch (Exception ignore) {
+                        }
+                    }
+                }
+            });
         }
 
         pill.setOnTouchListener(new View.OnTouchListener() {
