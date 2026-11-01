@@ -14,17 +14,23 @@ import {
   Wrench,
 } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import { Badge, Button, IconButton, StatusPill, taskTone } from '../../components/ui/primitives'
+import { Badge, Button, IconButton, StatusPill, Toggle, taskTone } from '../../components/ui/primitives'
 import { BottomSheet, Menu, MenuItem } from '../../components/ui/overlays'
 import { Wordmark } from '../../components/brand/Mark'
 import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../components/chat/Chat'
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { PhoneModels } from './PhoneModels'
-import { connectors, usage } from '../../data/work'
+import { connectors, skills, usage } from '../../data/work'
 import { modelLabel } from '../../lib/labels'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
+
+const MCP_SERVERS = [
+  { id: 'mcp_fs', name: 'mcp/filesystem', detail: '受限目录 ~/projects · 只读', status: 'connected' as const },
+  { id: 'mcp_gh', name: 'mcp/github', detail: 'repo:read · 2 个仓库已授权', status: 'connected' as const },
+  { id: 'mcp_pg', name: 'mcp/postgres', detail: 'dev-cluster · 只读账号过期', status: 'needs_auth' as const },
+]
 
 export type PhoneRoute = 'chat' | 'projects' | 'agent' | 'connectors' | 'settings'
 
@@ -45,9 +51,11 @@ export function PhoneShell({
   setRoute: (r: PhoneRoute) => void
   onOpenApproval: () => void
 }) {
-  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId } = useNexus()
+  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId, pauseTask, resumeTask, cancelTask, toast } = useNexus()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [taskSheet, setTaskSheet] = useState(false)
+  const [skillsOpen, setSkillsOpen] = useState(false)
+  const [skillState, setSkillState] = useState<Record<string, boolean>>(() => Object.fromEntries(skills.map((s) => [s.id, s.enabled])))
   const pendingList = approvals.filter((a) => a.status === 'PENDING')
   const pending = pendingList.length
   const phone = devices[0]
@@ -143,7 +151,7 @@ export function PhoneShell({
                 </div>
               ))}
             </div>
-            <Button size="sm" variant="secondary" block className="mt-3" icon={<Wrench size={14} />}>
+            <Button size="sm" variant="secondary" block className="mt-3" icon={<Wrench size={14} />} onClick={() => setSkillsOpen(true)}>
               管理技能与 MCP
             </Button>
           </div>
@@ -275,45 +283,226 @@ export function PhoneShell({
               </div>
             ))}
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            {task.status === 'PAUSED' ? (
+              <Button size="sm" variant="secondary" className="flex-1" onClick={() => resumeTask(task.id)}>
+                恢复执行
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                disabled={['COMPLETED', 'FAILED', 'CANCELLED'].includes(task.status)}
+                onClick={() => pauseTask(task.id)}
+              >
+                暂停
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1"
+              disabled={['COMPLETED', 'FAILED', 'CANCELLED'].includes(task.status)}
+              onClick={() => cancelTask(task.id)}
+            >
+              取消任务
+            </Button>
+          </div>
           <p className="mt-3 text-[11px] text-[var(--faint)]">完整时间线与 Diff 在平板 Pro 模式查看。</p>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={skillsOpen} onClose={() => setSkillsOpen(false)} title="技能与 MCP" height="max-h-[84%]">
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <p className="label">已安装技能</p>
+            <Badge tone="neutral" className="ml-auto">
+              {Object.values(skillState).filter(Boolean).length}/{skills.length} 启用
+            </Badge>
+          </div>
+          <div className="mt-1.5 space-y-1.5">
+            {skills.map((s) => (
+              <div key={s.id} className="flex items-center gap-2.5 rounded-[14px] bg-[var(--surface-2)] px-3 py-2">
+                <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface)] text-[var(--accent)]">
+                  <Wrench size={14} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] text-[var(--fg)]">{s.name}</span>
+                  <span className="block truncate text-[11px] text-[var(--faint)]">
+                    v{s.version} · {s.scope} · {s.permissions}
+                  </span>
+                </span>
+                <Toggle
+                  checked={skillState[s.id]}
+                  label={`启用 ${s.name}`}
+                  onChange={(v) => {
+                    setSkillState((prev) => ({ ...prev, [s.id]: v }))
+                    toast({ title: v ? '已启用技能' : '已停用技能', detail: s.name, tone: v ? 'ok' : 'neutral' })
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <p className="label mt-4">MCP Server</p>
+          <div className="mt-1.5 space-y-1.5">
+            {MCP_SERVERS.map((m) => (
+              <div key={m.id} className="flex items-center gap-2.5 rounded-[14px] bg-[var(--surface-2)] px-3 py-2">
+                <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface)] text-[var(--faint)]">
+                  <Plug size={14} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-[12.5px] text-[var(--fg)]">{m.name}</span>
+                  <span className="block truncate text-[11px] text-[var(--faint)]">{m.detail}</span>
+                </span>
+                <StatusPill label={m.status === 'connected' ? '已连接' : '需授权'} tone={m.status === 'connected' ? 'ok' : 'warn'} />
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-[var(--faint)]">技能与 MCP 为演示数据；开关只影响本机展示，不会真的执行工具。</p>
         </div>
       </BottomSheet>
     </div>
   )
 }
 
+const PROJECTS = [
+  {
+    name: 'nexus-core',
+    lang: 'Kotlin',
+    branch: 'agent/harness-checkpoint',
+    dirty: 4,
+    changes: [
+      { file: 'core/agent/harness/CheckpointStore.kt', add: 62, del: 9 },
+      { file: 'core/agent/harness/AgentLoop.kt', add: 18, del: 4 },
+      { file: 'core/agent/harness/CheckpointStoreTest.kt', add: 41, del: 0 },
+      { file: 'gradle/libs.versions.toml', add: 2, del: 1 },
+    ],
+    commits: [
+      { sha: 'a1b2c3d', msg: 'feat(agent): 检查点幂等写入', time: '今天 14:02' },
+      { sha: '9f8e7d6', msg: 'fix(agent): 事件去重表', time: '昨天 18:40' },
+      { sha: '5c4b3a2', msg: 'chore: 升级 kotlin 2.1', time: '昨天 09:12' },
+    ],
+  },
+  {
+    name: 'orbit-api',
+    lang: 'TypeScript',
+    branch: 'main',
+    dirty: 0,
+    changes: [],
+    commits: [
+      { sha: 'b7c8d9e', msg: 'feat: 卫星坐标框架', time: '今天 11:20' },
+      { sha: 'e1f2a3b', msg: 'test: 开普勒边界用例', time: '昨天 16:55' },
+    ],
+  },
+  {
+    name: 'field-notes',
+    lang: 'Markdown',
+    branch: 'main',
+    dirty: 0,
+    changes: [],
+    commits: [{ sha: 'c3d4e5f', msg: 'docs: 周会记录与决策', time: '昨天 21:05' }],
+  },
+]
+
 function PhoneProjects() {
   const { toast } = useNexus()
+  const [openName, setOpenName] = useState<string | null>(null)
+  const project = PROJECTS.find((p) => p.name === openName) ?? null
+
   return (
-    <div className="h-full overflow-y-auto px-4 py-3">
-      <div className="space-y-2">
-        {[
-          { name: 'nexus-core', meta: 'Kotlin · main · 4 个未提交变更', active: true },
-          { name: 'orbit-api', meta: 'TypeScript · main · 干净' },
-          { name: 'field-notes', meta: 'Markdown · main · 干净' },
-        ].map((p) => (
-          <button
-            key={p.name}
-            onClick={() => toast({ title: `打开 ${p.name}`, detail: '手机端以查看与审批为主，编辑建议在平板', tone: 'neutral' })}
-            className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--accent)]">
-              {p.name.slice(0, 2).toUpperCase()}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13.5px] text-[var(--fg)]">{p.name}</span>
-              <span className="block truncate text-[11px] text-[var(--faint)]">{p.meta}</span>
-            </span>
-            <ChevronRight size={15} className="text-[var(--faint)]" />
-          </button>
-        ))}
+    <>
+      <div className="h-full overflow-y-auto px-4 py-3">
+        <div className="space-y-2">
+          {PROJECTS.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => setOpenName(p.name)}
+              className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--accent)]">
+                {p.name.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13.5px] text-[var(--fg)]">{p.name}</span>
+                <span className="block truncate text-[11px] text-[var(--faint)]">
+                  {p.lang} · {p.branch} · {p.dirty ? `${p.dirty} 个未提交变更` : '干净'}
+                </span>
+              </span>
+              <ChevronRight size={15} className="text-[var(--faint)]" />
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
+          <p className="text-[12px] text-[var(--fg)]">最近编辑</p>
+          <p className="mt-1 font-mono text-[11.5px] text-[var(--faint)]">core/agent/harness/AgentLoop.kt</p>
+          <p className="text-[11px] text-[var(--faint)]">分支 agent/harness-checkpoint · 检查点 ckpt_0007</p>
+        </div>
+        <p className="caption mt-3 px-1">手机不堆叠项目树、终端与多面板；复杂操作在平板 Pro 模式完成。</p>
       </div>
-      <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
-        <p className="text-[12px] text-[var(--fg)]">最近编辑</p>
-        <p className="mt-1 font-mono text-[11.5px] text-[var(--faint)]">core/agent/harness/AgentLoop.kt</p>
-        <p className="text-[11px] text-[var(--faint)]">分支 agent/harness-checkpoint · 检查点 ckpt_0007</p>
-      </div>
-      <p className="caption mt-3 px-1">手机不堆叠项目树、终端与多面板；复杂操作在平板 Pro 模式完成。</p>
-    </div>
+
+      <BottomSheet open={Boolean(project)} onClose={() => setOpenName(null)} title={project?.name} height="max-h-[82%]">
+        {project && (
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Badge tone="neutral">{project.lang}</Badge>
+              <span className="truncate font-mono text-[11.5px] text-[var(--muted)]">{project.branch}</span>
+              <StatusPill
+                label={project.dirty ? `${project.dirty} 个变更` : '工作区干净'}
+                tone={project.dirty ? 'warn' : 'ok'}
+                className="ml-auto"
+              />
+            </div>
+
+            <p className="label mt-4">未提交变更</p>
+            {project.changes.length ? (
+              <div className="mt-1.5 space-y-1">
+                {project.changes.map((c) => (
+                  <div key={c.file} className="flex items-center gap-2 rounded-[10px] bg-[var(--surface-2)] px-2.5 py-1.5">
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-[var(--fg)]">{c.file}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-[var(--ok)]">+{c.add}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-[var(--danger)]">−{c.del}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1.5 text-[12px] text-[var(--faint)]">工作区干净，没有待提交的改动。</p>
+            )}
+
+            <p className="label mt-4">最近提交</p>
+            <div className="mt-1.5 space-y-1.5">
+              {project.commits.map((c) => (
+                <div key={c.sha} className="flex items-baseline gap-2">
+                  <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg)]">{c.msg}</span>
+                  <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{c.time}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => toast({ title: '已在平板打开', detail: `${project.name} · Pro 模式`, tone: 'ok' })}
+              >
+                在平板打开
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="flex-1"
+                onClick={() => toast({ title: '路径已复制', detail: `~/projects/${project.name}`, tone: 'neutral' })}
+              >
+                复制路径
+              </Button>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-[var(--faint)]">项目、变更与提交为演示数据；真实编辑与终端在平板/桌面版完成。</p>
+          </div>
+        )}
+      </BottomSheet>
+    </>
   )
 }

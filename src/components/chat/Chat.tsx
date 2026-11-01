@@ -95,7 +95,7 @@ export function SessionList({ onOpenSettings }: { onOpenSettings?: () => void })
                 </div>
               </button>
 
-              <div className="absolute right-1.5 top-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <div className="absolute right-1.5 top-2 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <Menu
                   label="会话操作"
                   width="w-44"
@@ -347,7 +347,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
                 )}
 
                 {!m.streaming && m.content && (
-                  <div className="mt-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <div className="mt-1.5 flex items-center gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
                     <IconButton label="复制回复" size="sm" onClick={() => copy(m.content)}>
                       <Copy size={13} />
                     </IconButton>
