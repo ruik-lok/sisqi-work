@@ -21,7 +21,8 @@ import { ChatErrorBanner, ChatThread, Composer, SessionList } from '../../compon
 import { TaskCard } from '../../components/panels/TaskCard'
 import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { PhoneModels } from './PhoneModels'
-import { connectors, models, usage } from '../../data/work'
+import { connectors, usage } from '../../data/work'
+import { modelLabel } from '../../lib/labels'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -44,7 +45,7 @@ export function PhoneShell({
   setRoute: (r: PhoneRoute) => void
   onOpenApproval: () => void
 }) {
-  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval } = useNexus()
+  const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval, models, modelId } = useNexus()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [taskSheet, setTaskSheet] = useState(false)
   const pendingList = approvals.filter((a) => a.status === 'PENDING')
@@ -186,7 +187,7 @@ export function PhoneShell({
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-[12px] text-[var(--muted)]">默认模型</span>
-                <span className="ml-auto font-mono text-[12px] text-[var(--fg)]">{models[0].name}</span>
+                <span className="ml-auto font-mono text-[12px] text-[var(--fg)]">{modelLabel(models.find((m) => m.id === modelId))}</span>
               </div>
             </section>
 

@@ -5,6 +5,7 @@ import { Badge, Button, StatusPill } from '../../components/ui/primitives'
 import { Dialog } from '../../components/ui/overlays'
 import { useNexus } from '../../state/store'
 import { isEncryptedStore, secretStorageLabel } from '../../lib/secrets'
+import { modelLabel } from '../../lib/labels'
 import type { Provider } from '../../data/work'
 
 /**
@@ -40,6 +41,11 @@ export function PhoneModels() {
     setBusy(true)
     try {
       await persist(editing)
+      // 刚给这个 Provider 配了密钥：如果当前默认模型不属于它，自动切到它的第一个模型
+      if (hadKey && activeModel?.providerId !== editing.id) {
+        const nextModel = models.find((m) => m.providerId === editing.id && m.enabled)
+        if (nextModel) setDefaultModel(nextModel.id)
+      }
       toast({ title: '已保存', detail: hadKey ? `密钥已写入${isEncryptedStore() ? '加密存储' : '本机存储'}` : 'Base URL 已更新', tone: 'ok' })
       setEditingId(null)
     } finally {
@@ -63,7 +69,7 @@ export function PhoneModels() {
       <section className="mt-2 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
         <div className="flex items-center gap-2">
           <span className="text-[13.5px] text-[var(--fg)]">模型与 API</span>
-          <Badge tone="neutral" className="ml-auto font-mono">{activeModel?.name ?? '未选择'}</Badge>
+          <Badge tone="neutral" className="ml-auto font-mono">{modelLabel(activeModel)}</Badge>
         </div>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--faint)]">
           密钥保存在{secretStorageLabel()}，界面只显示掩码。
@@ -108,7 +114,7 @@ export function PhoneModels() {
                     active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--muted)]',
                   )}
                 >
-                  <span className="min-w-0 flex-1 truncate font-mono">{m.name}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono">{modelLabel(m)}</span>
                   <span className="shrink-0 text-[10.5px] text-[var(--faint)]">{provider?.name ?? '—'}</span>
                   {active && <Check size={13} className="shrink-0" />}
                 </button>

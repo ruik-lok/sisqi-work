@@ -25,6 +25,7 @@ import { THEME_OPTIONS, useNexus } from '../../state/store'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel } from '../../lib/labels'
 import { isDesktop, isEncryptedStore, isNativeShell, runtimeLabel, secretStorageLabel } from '../../lib/secrets'
+import { modelLabel } from '../../lib/labels'
 
 type Section = 'appearance' | 'models' | 'devices' | 'security' | 'backup' | 'about'
 
@@ -275,7 +276,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
                 <div>
                   <h2 className="text-[20px] font-semibold text-[var(--fg)]">模型与 API</h2>
                   <p className="mt-1 text-[13px] text-[var(--muted)]">
-                    目前支持 OpenAI 兼容协议。当前默认：<span className="font-mono text-[var(--fg)]">{models.find((m) => m.id === modelId)?.name ?? '未选择'}</span>
+                    目前支持 OpenAI 兼容协议。当前默认：<span className="font-mono text-[var(--fg)]">{modelLabel(models.find((m) => m.id === modelId))}</span>
                     {activeProvider ? ` · ${activeProvider.keyMasked}` : ''}
                   </p>
                 </div>
@@ -373,7 +374,7 @@ export function SettingsScreen({ onOpenApproval }: { onOpenApproval: () => void 
                       {models.map((m) => (
                         <tr key={m.id} className="border-b border-[var(--line)] last:border-0">
                           <td className="px-3 py-2">
-                            <span className="font-mono text-[12px] text-[var(--fg)]">{m.name}</span>
+                            <span className="font-mono text-[12px] text-[var(--fg)]">{modelLabel(m)}</span>
                             {m.id === modelId && <Badge tone="accent" className="ml-2">当前</Badge>}
                           </td>
                           <td className="px-3 py-2 text-[11.5px] text-[var(--muted)]">{providers.find((p) => p.id === m.providerId)?.name ?? '—'}</td>

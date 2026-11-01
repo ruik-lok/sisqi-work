@@ -24,6 +24,7 @@ import { Badge, Button, IconButton, Meter, StatusPill, taskTone } from '../ui/pr
 import { Dialog, Menu, MenuItem } from '../ui/overlays'
 import { WorkMark } from '../brand/Mark'
 import { useNexus } from '../../state/store'
+import { modelLabel } from '../../lib/labels'
 
 
 /* ------------------------------------------------------------------ sessions */
@@ -409,7 +410,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
                   className="inline-flex h-8 items-center gap-1.5 rounded-[10px] px-2 text-[12.5px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
                 >
                   <span className={cn('size-1.5 rounded-full', demoMode ? 'bg-[var(--warn)]' : 'bg-[var(--ok)]')} />
-                  <span className="max-w-[140px] truncate font-mono">{model?.name ?? '未选择模型'}</span>
+                  <span className="max-w-[140px] truncate font-mono">{model ? modelLabel(model) : '未选择模型'}</span>
                   <ChevronDown size={12} />
                 </button>
               )}
@@ -429,7 +430,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
                         }}
                         hint={`${m.contextK}k`}
                       >
-                        <span className="font-mono text-[12.5px]">{m.name}</span>
+                        <span className="font-mono text-[12.5px]">{modelLabel(m)}</span>
                         <span className="ml-1 text-[10.5px] text-[var(--faint)]">{p?.name}</span>
                       </MenuItem>
                     )
@@ -478,7 +479,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
         </div>
         {!dense && (
           <p className="mt-1.5 px-1 text-[11px] text-[var(--faint)]">
-            {model?.name} · 上下文 {model?.contextK}k · 输出单价 ${model?.priceOut}/M · 能力来源 {model?.capabilitySource}
+            {modelLabel(model)} · 上下文 {model?.contextK}k{model?.priceOut ? ` · 输出单价 ${model.priceOut}/M` : ''} · 能力来源 {model?.capabilitySource}
           </p>
         )}
       </div>
@@ -509,7 +510,7 @@ export function ContextPanel({ onOpenApproval, onOpenSettings }: { onOpenApprova
               切换
             </Button>
           </div>
-          <p className="mt-1 font-mono text-[13.5px] text-[var(--fg)]">{model?.name ?? '未配置'}</p>
+          <p className="mt-1 font-mono text-[13.5px] text-[var(--fg)]">{model ? modelLabel(model) : '未配置'}</p>
           <p className="mt-0.5 text-[12px] text-[var(--muted)]">
             {provider?.name ?? '—'} · {provider?.route === 'proxy' ? '云端代理' : '本地直连'} · {model?.contextK ?? 0}k 上下文
           </p>

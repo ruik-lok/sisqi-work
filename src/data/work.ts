@@ -45,7 +45,10 @@ export interface Provider {
 
 export interface ModelInfo {
   id: string
+  /** 发给供应商的模型 ID（OpenAI 兼容协议里的 model 字段） */
   name: string
+  /** 界面上显示的名字，缺省用 name */
+  label?: string
   providerId: string
   contextK: number
   priceIn: number
@@ -145,7 +148,7 @@ export const providers: Provider[] = [
     keyMasked: 'sk-••••••••••••b90e',
     enabled: true,
     status: 'unverified',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: ['deepseek-flash', 'deepseek-v4-pro'],
     lastTest: null,
     latencyMs: null,
     route: 'direct',
@@ -166,10 +169,10 @@ export const providers: Provider[] = [
 ]
 
 export const models: ModelInfo[] = [
-  { id: 'm_gpt52', name: 'gpt-5.2', providerId: 'p_openai', contextK: 400, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具', '结构化', '推理'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
+  { id: 'm_gpt52', name: 'gpt-5.2', providerId: 'p_openai', contextK: 400, priceIn: 1.25, priceOut: 10, capabilities: ['文本', '视觉', '工具', '结构化', '推理'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_gpt52mini', name: 'gpt-5.2-mini', providerId: 'p_openai', contextK: 200, priceIn: 0.25, priceOut: 2, capabilities: ['文本', '工具', '结构化'], enabled: true, capabilitySource: '供应商元数据' },
-  { id: 'm_ds', name: 'deepseek-reasoner', providerId: 'p_deepseek', contextK: 128, priceIn: 0.55, priceOut: 2.19, capabilities: ['文本', '推理'], enabled: true, capabilitySource: '实测' },
-  { id: 'm_ds_chat', name: 'deepseek-chat', providerId: 'p_deepseek', contextK: 128, priceIn: 0.27, priceOut: 1.1, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '供应商元数据' },
+  { id: 'm_ds_flash', name: 'deepseek-flash', label: 'DeepSeek-V4.1-Flash', providerId: 'p_deepseek', contextK: 1024, priceIn: 0, priceOut: 0, capabilities: ['文本', '视觉', '工具', '推理', '结构化'], enabled: true, isDefault: true, capabilitySource: '供应商元数据' },
+  { id: 'm_ds_pro', name: 'deepseek-v4-pro', label: 'DeepSeek-V4-Pro', providerId: 'p_deepseek', contextK: 1024, priceIn: 0, priceOut: 0, capabilities: ['文本', '工具', '推理'], enabled: true, capabilitySource: '供应商元数据' },
   { id: 'm_qwen', name: 'qwen3-coder', providerId: 'p_custom', contextK: 256, priceIn: 0.3, priceOut: 1.2, capabilities: ['文本', '工具'], enabled: true, capabilitySource: '实测' },
 ]
 

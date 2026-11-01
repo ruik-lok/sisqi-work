@@ -1,4 +1,4 @@
-﻿import type { CapabilityStatus, DeviceStatus, TaskStatus } from '../data/nexus'
+import type { CapabilityStatus, DeviceStatus, TaskStatus } from '../data/nexus'
 
 const TASK: Record<TaskStatus, string> = {
   QUEUED: '排队中',
@@ -37,3 +37,4 @@ const CAP: Record<CapabilityStatus, string> = {
 export const taskStatusLabel = (s: TaskStatus) => TASK[s]
 export const deviceStatusLabel = (s: DeviceStatus) => DEVICE[s]
 export const capabilityLabel = (s: CapabilityStatus) => CAP[s]
+export const modelLabel = (m: { name: string; label?: string } | undefined | null) => (m ? m.label ?? m.name : '—')

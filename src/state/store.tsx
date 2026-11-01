@@ -220,8 +220,9 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     return initial.modelId ?? seedModels.find((m) => m.isDefault)?.id ?? seedModels[0].id
   })
   const [modelList, setModelList] = useState<ModelInfo[]>(() => {
-    // 本地已保存的模型 + 新版本内置模型（按 id 去重），避免升级后看不到新加的模型
-    const merged = initial.models?.length ? [...initial.models] : []
+    // 本地已保存的模型 + 新版本内置模型（按 id 去重）；顺带清掉早期内置的 deepseek-chat / reasoner 演示条目
+    const legacy = new Set(['m_ds', 'm_ds_chat'])
+    const merged = (initial.models ?? []).filter((m) => !legacy.has(m.id))
     for (const m of seedModels) if (!merged.some((x) => x.id === m.id)) merged.push(m)
     return merged.length ? merged : seedModels
   })
@@ -284,6 +285,13 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       }
       if (cancelled) return
       keysRef.current = next
+      // 当前默认模型没配密钥、而别的 Provider 有时，自动切到可用的那个（例如只配了 DeepSeek Key）
+      setModelIdState((cur) => {
+        const curModel = modelList.find((m) => m.id === cur)
+        if (curModel && next[curModel.providerId]) return cur
+        const usable = modelList.find((m) => m.enabled && next[m.providerId])
+        return usable ? usable.id : cur
+      })
       setKeyTick((v) => v + 1)
       setProviders((prev) => prev.map((p) => ({ ...p, keyMasked: next[p.id] ? maskKey(next[p.id]) : '未配置' })))
     })()
