@@ -357,6 +357,14 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
     setText('')
   }
 
+  // 输入框随内容长高（最多 10rem），避免长文本只能在小窗里滚动
+  useEffect(() => {
+    const el = ta.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+  }, [text])
+
   return (
     <div className={cn('shrink-0 border-t border-[var(--line)] bg-[var(--bg)]', dense ? 'px-3 py-2.5' : 'px-8 py-3')}>
       <div className={cn('mx-auto', dense ? 'max-w-none' : 'max-w-[760px]')}>
@@ -375,7 +383,9 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              // 触屏键盘上 Enter 应该换行；物理键盘仍保留 Enter 发送、Shift+Enter 换行
+              const coarse = window.matchMedia('(pointer: coarse)').matches
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !coarse) {
                 e.preventDefault()
                 send()
               }

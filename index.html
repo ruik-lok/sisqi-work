@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
@@ -12,6 +12,20 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // 原生外壳桥接：把当前主题告诉 Android，决定状态栏/导航栏图标是深色还是浅色（浏览器里无 SisqiHost，静默跳过）
+      (function () {
+        function sync() {
+          if (!window.SisqiHost) return
+          try {
+            window.SisqiHost.setChrome(document.documentElement.dataset.theme || 'dark')
+          } catch (e) {}
+        }
+        sync()
+        new MutationObserver(sync).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+        setTimeout(sync, 260)
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

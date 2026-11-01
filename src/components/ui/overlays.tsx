@@ -1,4 +1,4 @@
-﻿import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRight, Check, Search, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -322,57 +322,81 @@ export function Menu({
   label: string
   width?: string
 }) {
+  const root = useOverlayRoot()
   const [open, setOpen] = useState(false)
-  const [placement, setPlacement] = useState<{ up: boolean; maxHeight: number; dx: number }>({ up: false, maxHeight: 420, dx: 0 })
+  const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
 
-  useLayoutEffect(() => {
-    if (!open) return
+  // 用 fixed + portal 定位：父级卡片常带 overflow-hidden / transform，绝对定位会被裁掉或错位。
+  // 方向选择顺序：side 指定且放得下 → 另一侧放得下 → 空间更大的一侧；最后按可用高度收缩并滚动，绝不越出视口。
+  const place = useCallback(() => {
     const host = wrap.current
     if (!host) return
-    // 设备外框（带 data-screen-frame）为边界；桌面模式退化为视口
-    const frame = host.closest('[data-screen-frame]') as HTMLElement | null
-    const frameRect = frame?.getBoundingClientRect()
-    const scale = frame && frame.offsetWidth ? frameRect!.width / frame.offsetWidth : 1
-    const top = frameRect ? frameRect.top : 0
-    const bottom = frameRect ? frameRect.bottom : window.innerHeight
-    const leftEdge = frameRect ? frameRect.left : 0
-    const rightEdge = frameRect ? frameRect.right : window.innerWidth
-    const hostRect = host.getBoundingClientRect()
-    const contentHeight = panel.current?.scrollHeight ?? 280
-    const spaceBelow = (bottom - hostRect.bottom) / scale - 8
-    const spaceAbove = (hostRect.top - top) / scale - 8
-    const up = side === 'top' || (side === 'auto' && contentHeight + 8 > spaceBelow && spaceAbove > spaceBelow)
-    const maxHeight = Math.max(140, Math.min(420, Math.floor(up ? spaceAbove : spaceBelow)))
-
-    // 水平方向贴边时用 margin 向内收（不用 transform，避免与入场动画冲突）
     const node = panel.current
-    if (node) node.style.marginLeft = '0px'
-    const panelRect = node?.getBoundingClientRect()
-    const margin = 8 * scale
-    let dx = 0
-    if (panelRect) {
-      if (panelRect.left < leftEdge + margin) dx = (leftEdge + margin - panelRect.left) / scale
-      else if (panelRect.right > rightEdge - margin) dx = (rightEdge - margin - panelRect.right) / scale
-    }
-    setPlacement({ up, maxHeight, dx })
-  }, [open, side, align])
+    // 边界：预览舞台里是缩放过的设备外框（fixed 在 transform 祖先内以本地坐标解析），否则是视口
+    const frame = host.closest('[data-screen-frame]') as HTMLElement | null
+    const fr = frame?.getBoundingClientRect()
+    const scale = frame && frame.offsetWidth ? fr!.width / frame.offsetWidth : 1
+    const bx = fr ? fr.left : 0
+    const by = fr ? fr.top : 0
+    const vw = fr ? fr.width / scale : document.documentElement.clientWidth || window.innerWidth
+    const vh = fr ? fr.height / scale : document.documentElement.clientHeight || window.innerHeight
+    const r = host.getBoundingClientRect()
+    const anchor = { top: (r.top - by) / scale, bottom: (r.bottom - by) / scale, left: (r.left - bx) / scale, right: (r.right - bx) / scale }
+    const M = 8
+    const GAP = 6
+    const w = node?.offsetWidth || 224
+    const natural = node?.scrollHeight || 280
+    const spaceBelow = vh - anchor.bottom - GAP - M
+    const spaceAbove = anchor.top - GAP - M
+    const fitsBelow = natural <= spaceBelow
+    const fitsAbove = natural <= spaceAbove
+    let up: boolean
+    if (side === 'top') up = fitsAbove || (!fitsBelow && spaceAbove >= spaceBelow)
+    else if (fitsBelow) up = false
+    else up = fitsAbove || spaceAbove > spaceBelow
+    const maxHeight = Math.max(96, Math.min(420, Math.floor(up ? spaceAbove : spaceBelow)))
+    const h = Math.min(natural, maxHeight)
+    const top = up ? Math.max(M, anchor.top - GAP - h) : Math.min(anchor.bottom + GAP, vh - M - h)
+    const left = Math.max(M, Math.min(align === 'right' ? anchor.right - w : anchor.left, vw - M - w))
+    setPos({ left: Math.round(left), top: Math.round(top), maxHeight })
+  }, [align, side])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    place()
+    const node = panel.current
+    if (!node) return
+    const ro = new ResizeObserver(place)
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [open, place])
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (!wrap.current?.contains(t) && !panel.current?.contains(t)) setOpen(false)
     }
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    const onReposition = () => setOpen(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    const dismiss = () => setOpen(false)
+    // 菜单自身滚动不应关闭菜单；只有页面级滚动才收起
+    const onScroll = (e: Event) => {
+      if (panel.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
-    window.addEventListener('resize', onReposition)
+    window.addEventListener('resize', dismiss)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
-      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('resize', dismiss)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [open])
 
@@ -380,25 +404,22 @@ export function Menu({
   return (
     <div ref={wrap} className="relative">
       {trigger({ open, toggle: () => setOpen((v) => !v) })}
-      {open && (
-        <div
-          ref={panel}
-          role="menu"
-          aria-label={label}
-          style={{ maxHeight: placement.maxHeight, marginLeft: placement.dx }}
-          className={cn(
-            'absolute z-40 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--elevated)] p-1.5 shadow-[var(--shadow-2)] anim-pop',
-            width,
-            placement.up ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]',
-          )}
-        >
-          {typeof children === 'function' ? children(close) : children}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={panel}
+            role="menu"
+            aria-label={label}
+            style={{ left: pos ? pos.left : -9999, top: pos ? pos.top : -9999, maxHeight: pos ? pos.maxHeight : 420, visibility: pos ? 'visible' : 'hidden' }}
+            className={cn('fixed z-[70] overflow-y-auto overscroll-contain rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--elevated)] p-1.5 shadow-[var(--shadow-2)] anim-pop', width)}
+          >
+            {typeof children === 'function' ? children(close) : children}
+          </div>,
+          root,
+        )}
     </div>
   )
 }
-
 export function MenuItem({ children, selected, onSelect, hint }: { children: ReactNode; selected?: boolean; onSelect: () => void; hint?: string }) {
   return (
     <button

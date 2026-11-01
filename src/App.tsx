@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Check,
   ChevronDown,
@@ -291,10 +291,29 @@ function Stage() {
   )
 }
 
-export default function App() {
+/** 真机/APK 全屏模式：跳过预览舞台与设备外框，直接把手机端界面铺满窗口 */
+function NativeStage() {
+  const params = new URLSearchParams(window.location.search)
+  const [route, setRoute] = useState<PhoneRoute>((params.get('phone') as PhoneRoute | null) ?? 'chat')
+  const [approvalOpen, setApprovalOpen] = useState(params.get('dialog') === 'approval')
+
+  // 边到边：Android 外壳把真实状态栏/手势条高度按 CSS px 传进来，页面自己避让
+  const insetTop = Number(params.get('insetTop') ?? 0) || 0
+  const insetBottom = Number(params.get('insetBottom') ?? 0) || 0
+
   return (
-    <NexusProvider>
-      <Stage />
-    </NexusProvider>
+    <div
+      className="fixed inset-0 overflow-hidden bg-[var(--bg)]"
+      style={{ ['--safe-top' as string]: `${insetTop}px`, ['--safe-bottom' as string]: `${insetBottom}px` }}
+    >
+      <PhoneShell route={route} setRoute={setRoute} onOpenApproval={() => setApprovalOpen(true)} />
+      <ApprovalDialog open={approvalOpen} onClose={() => setApprovalOpen(false)} />
+      <ToastHost />
+    </div>
   )
+}
+
+export default function App() {
+  const native = new URLSearchParams(window.location.search).get('native') === '1'
+  return <NexusProvider>{native ? <NativeStage /> : <Stage />}</NexusProvider>
 }

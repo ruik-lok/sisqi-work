@@ -1,4 +1,4 @@
-﻿import {
+import {
   createContext,
   useCallback,
   useContext,
@@ -839,6 +839,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     resetUsage,
     resolvedTheme,
     resumeTask,
+    selectedTaskId,
     selectSession,
     selectTask,
     sendMessage,

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import {
   Bell,
   ChevronDown,
@@ -46,17 +46,24 @@ export function PhoneShell({
   const { activeSession, newSession, theme, setTheme, approvals, tasks, task, selectTask, approval } = useNexus()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [taskSheet, setTaskSheet] = useState(false)
-  const pending = approvals.filter((a) => a.status === 'PENDING').length
+  const pendingList = approvals.filter((a) => a.status === 'PENDING')
+  const pending = pendingList.length
   const phone = devices[0]
+  // 审批按钮：先切到有待审批的任务，再打开对话框；否则 ApprovalDialog 会因当前任务没有待审批项而空白
+  const openApprovals = () => {
+    const next = pendingList[0]
+    if (next && next.taskId !== task.id) selectTask(next.taskId)
+    onOpenApproval()
+  }
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--bg)]">
       {/* 状态栏安全区域：背景延伸，内容避让；不使用假图标 */}
-      <div className="h-[26px] shrink-0 bg-[var(--bg)]" aria-hidden="true" />
+      <div className="h-[var(--safe-top,26px)] shrink-0 bg-[var(--bg)]" aria-hidden="true" />
 
       <header className="flex h-12 shrink-0 items-center gap-2 bg-[var(--bg)] px-4">
         <Wordmark compact />
-        <span className="truncate text-[15px] font-semibold text-[var(--fg)]">
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-[var(--fg)]">
           {route === 'chat'
             ? activeSession.title
             : route === 'projects'
@@ -78,7 +85,7 @@ export function PhoneShell({
               </IconButton>
             </>
           )}
-          <IconButton label={`待批准 ${pending} 项`} size="sm" onClick={onOpenApproval} className="relative">
+          <IconButton label={`待批准 ${pending} 项`} size="sm" onClick={openApprovals} className="relative">
             <Bell size={17} />
             {pending > 0 && <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[var(--warn)]" />}
           </IconButton>
@@ -229,7 +236,7 @@ export function PhoneShell({
         </div>
       </nav>
       {/* 手势安全区域：背景延伸，不绘制假手势条 */}
-      <div className="h-[16px] shrink-0 bg-[var(--surface)]" aria-hidden="true" />
+      <div className="h-[var(--safe-bottom,16px)] shrink-0 bg-[var(--surface)]" aria-hidden="true" />
 
       <BottomSheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="会话历史">
         <SessionList onOpenSettings={() => setHistoryOpen(false)} />
@@ -259,7 +266,7 @@ export function PhoneShell({
           <div className="mt-3 space-y-2">
             {task.events.slice(-5).reverse().map((e) => (
               <div key={e.sequence} className="flex gap-2">
-                <span className="num w-9 shrink-0 text-[10.5px] text-[var(--faint)]">{e.timestamp}</span>
+                <span className="num w-[50px] shrink-0 text-[10.5px] leading-[1.6] text-[var(--faint)]">{e.timestamp}</span>
                 <span className="min-w-0 flex-1 text-[11.5px] text-[var(--muted)]">{e.label}</span>
               </div>
             ))}
