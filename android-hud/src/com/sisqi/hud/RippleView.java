@@ -1,6 +1,8 @@
 package com.sisqi.hud;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -29,6 +31,7 @@ public class RippleView extends View {
     private final List<Tap> taps = new ArrayList<Tap>();
     private final List<Swipe> swipes = new ArrayList<Swipe>();
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Bitmap whale;
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public RippleView(Context c) {
@@ -38,6 +41,16 @@ public class RippleView extends View {
         stroke.setStrokeWidth(6f);
         stroke.setStrokeCap(Paint.Cap.ROUND);
         setWillNotDraw(false);
+        // 鲸鱼位图（白色单色版，来自 DSH 图标路径）
+        try {
+            Drawable d = c.getDrawable(R.drawable.ic_stat);
+            int s = (int) (56 * c.getResources().getDisplayMetrics().density);
+            whale = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+            Canvas bc = new Canvas(whale);
+            d.setBounds(0, 0, s, s);
+            d.draw(bc);
+        } catch (Throwable ignore) {
+        }
     }
 
     void addTap(float x, float y) {
@@ -77,6 +90,13 @@ public class RippleView extends View {
             float p = age / (float) TAP_MS;
             paint.setColor(Color.argb((int) (200 * (1 - p)), 77, 107, 254));
             canvas.drawCircle(t.x, t.y, 14 + 40 * p, paint);
+            // 鲸鱼在涟漪中心，淡出并轻微放大
+            if (whale != null) {
+                paint.setAlpha((int) (255 * (1 - p)));
+                float half = whale.getWidth() / 2f * (0.9f + 0.5f * p);
+                canvas.drawBitmap(whale, null, new android.graphics.RectF(t.x - half, t.y - half, t.x + half, t.y + half), paint);
+                paint.setAlpha(255);
+            }
             paint.setColor(Color.argb((int) (255 * (1 - p)), 77, 107, 254));
             canvas.drawCircle(t.x, t.y, 10, paint);
             // 十字准心，方便看精确位置
