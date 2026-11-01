@@ -17,6 +17,7 @@ interface SisqiHostFiles {
   pickFolder?: (id: string) => void
   listFolder?: (id: string, treeUri: string, docId: string) => void
   readDoc?: (id: string, treeUri: string, docId: string) => void
+  readPath?: (id: string, treeUri: string, path: string) => void
 }
 
 export interface ProjectFile {
@@ -165,4 +166,14 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+/** 按相对路径读取目录内文件（如 .git/HEAD），用于读取仓库元信息 */
+export function readTreePath(treeUri: string, path: string): Promise<string | null> {
+  const host = window.SisqiHost
+  if (!host?.readPath) return Promise.resolve(null)
+  const id = `p${++seq}-${Date.now()}`
+  return new Promise((resolve) => {
+    docWaiters.set(id, (doc) => resolve(doc ? doc.text : null))
+    host.readPath!(id, treeUri, path)
+  })
 }

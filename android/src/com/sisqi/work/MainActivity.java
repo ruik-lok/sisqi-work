@@ -242,6 +242,59 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** 按相对路径读取目录内的文本文件（如 .git/HEAD），用于读取仓库信息 */
+        @JavascriptInterface
+        public void readPath(String id, String treeUri, String path) {
+            try {
+                Uri tree = Uri.parse(treeUri);
+                String docId = DocumentsContract.getTreeDocumentId(tree);
+                for (String seg : path.split("/")) {
+                    if (seg.isEmpty()) continue;
+                    docId = childDocId(tree, docId, seg);
+                    if (docId == null) {
+                        emitDoc(id, "null");
+                        return;
+                    }
+                }
+                Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, docId);
+                InputStream is = getContentResolver().openInputStream(doc);
+                if (is == null) throw new IOException("no stream");
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n, total = 0;
+                while ((n = is.read(buf)) > 0 && total < 512 * 1024) {
+                    bos.write(buf, 0, n);
+                    total += n;
+                }
+                is.close();
+                JSONObject o = new JSONObject();
+                o.put("text", new String(bos.toByteArray(), StandardCharsets.UTF_8));
+                emitDoc(id, o.toString());
+            } catch (Exception e) {
+                Log.w(TAG, "readPath failed: " + e);
+                emitDoc(id, "null");
+            }
+        }
+
+        /** 在指定目录下按名字找子项，返回 docId（找不到返回 null） */
+        private String childDocId(Uri tree, String parentDocId, String name) {
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentDocId);
+            String[] cols = new String[]{
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            };
+            Cursor c = getContentResolver().query(children, cols, null, null, null);
+            if (c == null) return null;
+            try {
+                while (c.moveToNext()) {
+                    if (name.equals(c.getString(1))) return c.getString(0);
+                }
+            } finally {
+                c.close();
+            }
+            return null;
+        }
+
         /** 读取文本文件内容（上限 256KB） */
         @JavascriptInterface
         public void readDoc(String id, String treeUri, String docId) {

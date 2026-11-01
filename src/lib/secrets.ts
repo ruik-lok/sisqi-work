@@ -19,6 +19,7 @@ interface NativeHost {
   pickFolder?: (id: string) => void
   listFolder?: (id: string, treeUri: string, docId: string) => void
   readDoc?: (id: string, treeUri: string, docId: string) => void
+  readPath?: (id: string, treeUri: string, path: string) => void
 }
 
 declare global {

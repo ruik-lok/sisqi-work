@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileText,
   FolderOpen,
+  GitBranch,
   FolderKanban,
   History,
   MessagesSquare,
@@ -30,6 +31,7 @@ import { connectors, skills } from '../../data/work'
 import { modelLabel } from '../../lib/labels'
 import { deviceInfo, ramGb } from '../../lib/native-device'
 import { formatBytes, isTextMime, listFolder, nativeFolderAvailable, pickFolder, readDoc, type ProjectTree } from '../../lib/native-files'
+import { readGitInfo, shortRemote, type GitInfo } from '../../lib/git-info'
 import { devices } from '../../data/nexus'
 import { deviceStatusLabel, taskStatusLabel } from '../../lib/labels'
 
@@ -423,6 +425,7 @@ function PhoneProjects() {
   const [stack, setStack] = useState<ProjectTree[]>([])
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<{ name: string; text: string; truncated?: boolean } | null>(null)
+  const [git, setGit] = useState<GitInfo | null>(null)
   const [hint, setHint] = useState('')
 
   const load = async (uri: string, docId = '') => {
@@ -435,6 +438,7 @@ function PhoneProjects() {
       }
       setHint('')
       setTree(next)
+      if (!docId) setGit(await readGitInfo(uri))
     } finally {
       setBusy(false)
     }
@@ -458,7 +462,7 @@ function PhoneProjects() {
 
   const refresh = async () => {
     if (!tree) return
-    await load(tree.uri, tree.docId === '' ? '' : tree.docId)
+    await load(tree.uri, stack.length ? tree.docId : '')
   }
 
   const enter = (docId: string, name: string) => {
@@ -488,7 +492,9 @@ function PhoneProjects() {
     setPreview({ name: file.name, text: doc.text, truncated: doc.truncated })
   }
 
-  const files = tree ? [...tree.files].sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name)) : []
+  const files = tree
+    ? [...tree.files].filter((f) => f.name !== '.git').sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name))
+    : []
   const folderCount = files.filter((f) => f.dir).length
 
   return (
@@ -532,6 +538,30 @@ function PhoneProjects() {
               选择文件夹
             </Button>
             {!nativeFolderAvailable() && <p className="mt-1.5 text-[11px] text-[var(--faint)]">目录选择仅在 APK 里可用</p>}
+          </section>
+        )}
+
+        {git && stack.length === 0 && (
+          <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
+            <div className="flex items-center gap-2">
+              <GitBranch size={14} className="shrink-0 text-[var(--accent)]" />
+              <span className="truncate font-mono text-[12px] text-[var(--fg)]">{git.branch ?? 'detached HEAD'}</span>
+              {git.sha && <span className="shrink-0 font-mono text-[11px] text-[var(--faint)]">{git.sha}</span>}
+              {git.remote && <span className="ml-auto truncate text-[10.5px] text-[var(--faint)]">{shortRemote(git.remote)}</span>}
+            </div>
+            {git.commits.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {git.commits.slice(0, 3).map((c) => (
+                  <div key={c.sha} className="flex items-baseline gap-2">
+                    <span className="shrink-0 font-mono text-[11px] text-[var(--accent)]">{c.sha}</span>
+                    <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--fg)]">{c.message}</span>
+                    <span className="shrink-0 text-[10.5px] text-[var(--faint)]">
+                      {c.time ? new Date(c.time).toLocaleDateString('zh-CN') : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
