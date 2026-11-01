@@ -6,60 +6,39 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.util.Log;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URLDecoder;
-import java.util.HashMap;
-import java.util.Map;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 
 /**
- * DSH HUD（流体云版）：只用 Android 16 的“实时更新”通知做状态播报，
- * ColorOS 会把它渲染成状态栏流体云。不创建任何悬浮窗。
- *
- * 接口：127.0.0.1:8765/act?type=status|tap|swipe|done&text=人话&x=..
+ * 悬浮窗 HUD：胶囊（状态文字）+ 涟漪（点击/滑动可视化），可拖动。
+ * 事件由广播（HudReceiver）转发到本服务；不依赖通知刷新，所以不受 ColorOS 后台限制影响。
  */
 public class HudService extends Service {
     public static volatile boolean isRunning = false;
+    static volatile HudService instance = null;
+
     private static final String CH = "hud";
-    private static final int PORT = 8765;
-    private static final int NOTIF_ID = 3;
-
-    private NotificationManager nm;
+    private WindowManager wm;
+    private FrameLayout rippleRoot;
+    private RippleView ripple;
+    private TextView pill;
+    private WindowManager.LayoutParams pillParams;
+    private int pillX = 24;
+    private int pillY = 300;
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private ServerSocket server;
-    private volatile boolean running = false;
-
-    private String cloudText = "DSH 就绪";
-    private long lastEventAt = SystemClock.uptimeMillis();
-    private long lastCloudAt = 0;
-    private Runnable pendingCloud;
-
-    /** 心跳：有活动时每 20s 续一次，30s 无事件就撤掉流体云 */
-    private final Runnable heartbeat = new Runnable() {
-        public void run() {
-            long idle = SystemClock.uptimeMillis() - lastEventAt;
-            if (idle <= 30000) {
-                pushCloudNow();
-                ui.postDelayed(this, 20000);
-            } else {
-                try {
-                    nm.cancel(NOTIF_ID);
-                } catch (Throwable ignore) {
-                }
-            }
-        }
-    };
+    private NotificationManager nm;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -70,205 +49,213 @@ public class HudService extends Service {
     public void onCreate() {
         super.onCreate();
         nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        startForeground(1, buildNotification("DSH HUD 运行中", "监听 127.0.0.1:" + PORT));
+        startForeground(1, buildNotification());
+        showOverlay();
+        instance = this;
         isRunning = true;
-        status("DSH 就绪");
-        ui.postDelayed(heartbeat, 20000);
-        startServer();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null) {
+            applyEvent(intent.getStringExtra("type"), intent.getStringExtra("text"),
+                    intent.getFloatExtra("x", -1), intent.getFloatExtra("y", -1),
+                    intent.getFloatExtra("x2", -1), intent.getFloatExtra("y2", -1));
+        }
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
-        running = false;
         isRunning = false;
+        instance = null;
         try {
-            if (server != null) server.close();
+            if (rippleRoot != null && wm != null) wm.removeView(rippleRoot);
+        } catch (Exception ignore) {
+        }
+        try {
+            if (pill != null && wm != null) wm.removeView(pill);
         } catch (Exception ignore) {
         }
         super.onDestroy();
     }
 
-    /* ------------------------------------------------------------ 状态 */
-
-    /** 状态变化：合并到 ~900ms 一次推给流体云（系统本身还有一层节流） */
-    private void status(String text) {
-        cloudText = text;
-        lastEventAt = SystemClock.uptimeMillis();
-        if (pendingCloud != null) ui.removeCallbacks(pendingCloud);
-        long wait = Math.max(0, 900 - (SystemClock.uptimeMillis() - lastCloudAt));
-        pendingCloud = new Runnable() {
+    /** 广播入口：type = tap | swipe | status | done | hide */
+    void applyEvent(final String type, final String text, final float x, final float y, final float x2, final float y2) {
+        ui.post(new Runnable() {
             public void run() {
-                pendingCloud = null;
-                pushCloudNow();
-            }
-        };
-        ui.postDelayed(pendingCloud, wait);
-    }
-
-    private void pushCloudNow() {
-        lastCloudAt = SystemClock.uptimeMillis();
-        if (nm == null) return;
-        try {
-            nm.notify(NOTIF_ID, buildPromoted(cloudText));
-        } catch (Throwable e) {
-            Log.w("HUD", "promote failed: " + e);
-        }
-    }
-
-    private void hideCloud() {
-        try {
-            nm.cancel(NOTIF_ID);
-        } catch (Throwable ignore) {
-        }
-    }
-
-    /* ------------------------------------------------------------ http */
-
-    private void startServer() {
-        running = true;
-        Thread t = new Thread(new Runnable() {
-            public void run() {
-                while (running) {
-                    try {
-                        if (server == null || server.isClosed()) {
-                            server = new ServerSocket(PORT, 16, InetAddress.getByName("127.0.0.1"));
-                            server.setReuseAddress(true);
-                        }
-                        Socket s = server.accept();
-                        try {
-                            s.setSoTimeout(3000);
-                            handle(s);
-                        } catch (Throwable e) {
-                            Log.w("HUD", "handle: " + e);
-                        } finally {
-                            try {
-                                s.close();
-                            } catch (Exception ignore) {
-                            }
-                        }
-                    } catch (Throwable e) {
-                        Log.w("HUD", "server loop: " + e);
-                        try {
-                            if (server != null) server.close();
-                        } catch (Exception ignore) {
-                        }
-                        server = null;
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException ignore) {
-                        }
+                try {
+                    if ("tap".equals(type) && ripple != null && x >= 0) ripple.addTap(x, y);
+                    if ("swipe".equals(type) && ripple != null && x >= 0 && x2 >= 0) ripple.addSwipe(x, y, x2, y2);
+                    if ("hide".equals(type)) {
+                        hidePill();
+                        return;
                     }
+                    if ("done".equals(type)) {
+                        tapDone(text == null || text.isEmpty() ? "任务完成" : text);
+                        return;
+                    }
+                    sendStatus(text == null || text.isEmpty() ? "DSH 操作中" : text);
+                } catch (Throwable e) {
+                    Log.w("HUD", "applyEvent: " + e);
                 }
             }
-        }, "hud-http");
-        t.setDaemon(true);
-        t.start();
+        });
     }
 
-    private void handle(Socket s) throws Exception {
-        BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
-        String line = in.readLine();
-        if (line == null) return;
-        String[] parts = line.split(" ");
-        String path = parts.length > 1 ? parts[1] : "/";
-        Map<String, String> q = new HashMap<String, String>();
-        int qi = path.indexOf('?');
-        if (qi >= 0) {
-            for (String kv : path.substring(qi + 1).split("&")) {
-                int eq = kv.indexOf('=');
-                if (eq > 0) q.put(kv.substring(0, eq), URLDecoder.decode(kv.substring(eq + 1), "UTF-8"));
-            }
-            path = path.substring(0, qi);
-        }
-        if (!"/act".equals(path) && !"/".equals(path)) {
-            respond(s, "unknown");
+    private void showOverlay() {
+        if (!android.provider.Settings.canDrawOverlays(this)) {
+            Log.w("HUD", "no overlay permission");
             return;
         }
-        String type = q.get("type");
-        String text = q.get("text");
-        if (type == null) type = "status";
-        if ("tap".equals(type)) {
-            status(text != null && !text.isEmpty() ? text : "点击");
-        } else if ("swipe".equals(type)) {
-            status(text != null && !text.isEmpty() ? text : "滑动");
-        } else if ("done".equals(type)) {
-            status(text != null && !text.isEmpty() ? text : "任务完成");
-            lastEventAt = SystemClock.uptimeMillis();
-        } else if ("hide".equals(type)) {
-            hideCloud();
-        } else {
-            status(text != null && !text.isEmpty() ? text : "DSH 操作中");
-        }
-        respond(s, "ok");
-    }
+        wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+        int type = Build.VERSION.SDK_INT >= 26
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
 
-    private void respond(Socket s, String body) {
+        rippleRoot = new FrameLayout(this);
+        ripple = new RippleView(this);
+        rippleRoot.addView(ripple, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        WindowManager.LayoutParams rp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        rp.gravity = Gravity.TOP | Gravity.START;
         try {
-            OutputStream os = s.getOutputStream();
-            byte[] b = body.getBytes("UTF-8");
-            String head = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + b.length
-                    + "\r\nConnection: close\r\n\r\n";
-            os.write(head.getBytes("UTF-8"));
-            os.write(b);
-            os.flush();
-        } catch (Exception ignore) {
+            wm.addView(rippleRoot, rp);
+        } catch (Exception e) {
+            Log.w("HUD", "add ripple: " + e);
         }
+
+        android.content.SharedPreferences sp = getSharedPreferences("hud", MODE_PRIVATE);
+        pillX = sp.getInt("x", 24);
+        pillY = sp.getInt("y", 300);
+        if (pillY < 240) pillY = 300;
+
+        pill = new TextView(this);
+        pill.setTextColor(Color.WHITE);
+        pill.setTextSize(12);
+        pill.setPadding(dp(12), dp(7), dp(12), dp(7));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#E01F2330"));
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(dp(1), Color.parseColor("#664D6BFE"));
+        pill.setBackground(bg);
+        pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stat, 0, 0, 0);
+        pill.setCompoundDrawablePadding(dp(6));
+
+        pillParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        pillParams.gravity = Gravity.TOP | Gravity.START;
+        pillParams.x = pillX;
+        pillParams.y = pillY;
+        try {
+            wm.addView(pill, pillParams);
+        } catch (Exception e) {
+            Log.w("HUD", "add pill: " + e);
+        }
+
+        pill.setOnTouchListener(new View.OnTouchListener() {
+            private float downRawX, downRawY;
+            private int startX, startY;
+            private boolean moved;
+
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawX = e.getRawX();
+                        downRawY = e.getRawY();
+                        startX = pillParams.x;
+                        startY = pillParams.y;
+                        moved = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        int dx = (int) (e.getRawX() - downRawX);
+                        int dy = (int) (e.getRawY() - downRawY);
+                        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+                        pillParams.x = startX + dx;
+                        pillParams.y = Math.max(0, startY + dy);
+                        try {
+                            wm.updateViewLayout(pill, pillParams);
+                        } catch (Exception ignore) {
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (moved) {
+                            pillX = pillParams.x;
+                            pillY = pillParams.y;
+                            getSharedPreferences("hud", MODE_PRIVATE).edit().putInt("x", pillX).putInt("y", pillY).apply();
+                        }
+                        return true;
+                }
+                return false;
+            }
+        });
     }
 
-    /* ------------------------------------------------------ notification */
+    private void sendStatus(final String text) {
+        ui.post(new Runnable() {
+            public void run() {
+                if (pill == null) return;
+                pill.setText(text);
+                pill.setTextColor(Color.WHITE);
+                pill.setAlpha(1f);
+            }
+        });
+    }
 
-    private Notification buildPromoted(String text) {
+    private void tapDone(final String text) {
+        ui.post(new Runnable() {
+            public void run() {
+                if (pill == null) return;
+                pill.setText(text);
+                pill.setTextColor(Color.parseColor("#7CFFB2"));
+                pill.setAlpha(1f);
+                ui.postDelayed(new Runnable() {
+                    public void run() {
+                        if (pill != null) pill.setAlpha(0.35f);
+                    }
+                }, 2500);
+            }
+        });
+    }
+
+    private void hidePill() {
+        ui.post(new Runnable() {
+            public void run() {
+                if (pill != null) pill.setAlpha(0f);
+            }
+        });
+    }
+
+    private Notification buildNotification() {
+        if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CH) == null) {
+            nm.createNotificationChannel(new NotificationChannel(CH, "DSH HUD", NotificationManager.IMPORTANCE_LOW));
+        }
         Intent open = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
-        b.setContentTitle(text)
-                .setContentText("DSH · 正在操作这台手机")
-                .setSmallIcon(R.drawable.ic_stat)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(pi)
-                .setCategory(Notification.CATEGORY_PROGRESS);
-        // Android 16：胶囊短文字 + 请求升级为「实时更新 / 流体云」
-        try {
-            Notification.Builder.class.getMethod("setShortCriticalText", CharSequence.class).invoke(b, "DSH");
-        } catch (Throwable ignore) {
-        }
-        try {
-            Notification.Builder.class.getMethod("setRequestPromotedOngoing", boolean.class).invoke(b, true);
-        } catch (Throwable ignore) {
-        }
-        return b.build();
-    }
-
-    private Notification buildNotification(String title, String text) {
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel c = new NotificationChannel(CH, "DSH HUD", NotificationManager.IMPORTANCE_LOW);
-            nm.createNotificationChannel(c);
-        }
-        Intent open = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE);
-        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
-        return b.setContentTitle(title)
-                .setContentText(text)
+        return b.setContentTitle("DSH HUD 运行中")
+                .setContentText("悬浮胶囊 + 涟漪已启用")
                 .setSmallIcon(R.drawable.ic_stat)
                 .setContentIntent(pi)
                 .setOngoing(true)
                 .build();
     }
 
-    /** 系统是否允许发布提升通知（API 36 才有） */
-    static String promotedState(android.content.Context ctx) {
-        try {
-            NotificationManager m = (NotificationManager) ctx.getSystemService(NOTIFICATION_SERVICE);
-            Object v = NotificationManager.class.getMethod("canPostPromotedNotifications").invoke(m);
-            return String.valueOf(v);
-        } catch (Throwable e) {
-            return "不可用（" + e.getClass().getSimpleName() + "）";
-        }
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 }

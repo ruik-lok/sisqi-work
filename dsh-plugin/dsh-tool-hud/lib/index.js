@@ -15,6 +15,7 @@ const RECEIVER = "com.sisqi.hud/.HudReceiver";
 function send(type, text) {
   return new Promise((resolve) => {
     const esc = String(text == null ? "" : text).replace(/'/g, "'\\''");
+    // 只发广播：实测「先 start-foreground-service 再广播」会让更新失效
     const cmd =
       "am broadcast -n " + RECEIVER + " -a com.sisqi.hud.ACT --es type " + type +
       " --es text '" + esc + "' >/dev/null 2>&1";
