@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.graphics.drawable.GradientDrawable;
 
 /**
  * 悬浮窗 HUD：胶囊（状态文字）+ 涟漪（点击/滑动可视化），可拖动。
@@ -138,15 +139,12 @@ public class HudService extends Service {
         pillY = sp.getInt("y", 300);
         if (pillY < 240) pillY = 300;
 
-        pill = new TextView(this);
+        pill = new GlassPill(this);
         pill.setTextColor(Color.WHITE);
         pill.setTextSize(12);
         pill.setPadding(dp(12), dp(7), dp(12), dp(7));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#E01F2330"));
-        bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), Color.parseColor("#664D6BFE"));
-        pill.setBackground(bg);
+        pill.setBackground(null);
+        pill.setShadowLayer(0, 0, 0, 0);
         pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stat, 0, 0, 0);
         pill.setCompoundDrawablePadding(dp(6));
 
