@@ -23,6 +23,7 @@ import { cn } from '../../lib/cn'
 import { Badge, Button, IconButton, Meter, StatusPill, taskTone } from '../ui/primitives'
 import { Dialog, Menu, MenuItem } from '../ui/overlays'
 import { WorkMark } from '../brand/Mark'
+import { MarkdownText } from './Markdown'
 import { useNexus } from '../../state/store'
 import { modelLabel } from '../../lib/labels'
 
@@ -210,8 +211,10 @@ export function SessionList({ onOpenSettings }: { onOpenSettings?: () => void })
 
 /* ------------------------------------------------------------------- thread */
 
+const EMPTY_SUGGESTIONS = ['帮我写一段 TypeScript 代码', '把这段话润色得更专业', '解释一下这个报错']
+
 export function ChatThread({ dense = false }: { dense?: boolean }) {
-  const { messages, streaming, regenerate, toast } = useNexus()
+  const { messages, streaming, regenerate, toast, setDraft } = useNexus()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -238,6 +241,17 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
             </div>
             <h2 className="text-[22px] font-semibold text-[var(--fg)]">让想法，真正成为作品。</h2>
             <p className="max-w-[36ch] text-[14px] leading-relaxed text-[var(--muted)]">描述你要做的事，我会规划、执行并把证据交给你。</p>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              {EMPTY_SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setDraft(s)}
+                  className="rounded-full border border-[var(--line)] px-3 py-1.5 text-[12.5px] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -245,7 +259,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
           if (m.role === 'user') {
             return (
               <div key={m.id} className="flex justify-end">
-                <div className={cn('wrap-any max-w-[78%] min-w-0 rounded-[16px] rounded-br-[6px] bg-[var(--accent-soft)] px-4 py-3 text-[15px] leading-relaxed text-[var(--fg)]', dense && 'text-[14px]')}>
+                <div className={cn('wrap-any max-w-[82%] min-w-0 rounded-[20px] rounded-br-[8px] bg-[var(--bubble)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--fg)]', dense && 'text-[14px]')}>
                   {m.content}
                 </div>
               </div>
@@ -254,7 +268,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
 
           if (m.role === 'tool') {
             return (
-              <div key={m.id} className="rounded-[12px] border border-[var(--line)] bg-[var(--surface)] p-3">
+              <div key={m.id} className="rounded-[16px] bg-[var(--surface-2)] p-3">
                 <div className="flex items-center gap-2">
                   <Wrench size={13} className="text-[var(--faint)]" />
                   <span className="text-[12px] font-medium text-[var(--muted)]">工具输出</span>
@@ -267,7 +281,7 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
 
           return (
             <div key={m.id} className="group flex gap-3">
-              <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--accent)]">
+              <div className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--accent)]">
                 <WorkMark size={15} />
               </div>
               <div className="min-w-0 flex-1">
@@ -277,9 +291,9 @@ export function ChatThread({ dense = false }: { dense?: boolean }) {
                   {m.streaming && <span className="text-[11px] text-[var(--accent)]">生成中…</span>}
                   {m.mode === 'demo' && !m.streaming && <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10.5px] text-[var(--faint)]">演示</span>}
                 </div>
-                <div className={cn('wrap-any mt-1 whitespace-pre-wrap text-[15px] leading-[1.75] text-[var(--fg)]', dense && 'text-[14px]')}>
-                  {m.content}
-                  {m.streaming && <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 bg-[var(--accent)] anim-pulse" />}
+                <div className={cn('mt-1 text-[15px] leading-[1.75] text-[var(--fg)]', dense && 'text-[14.5px]')}>
+                  {m.content ? <MarkdownText text={m.content} /> : m.streaming ? <span className="text-[var(--faint)]">正在思考…</span> : null}
+                  {m.streaming && <span className="ml-0.5 mt-1 inline-block h-4 w-[2px] bg-[var(--accent)] anim-pulse" />}
                 </div>
 
                 {m.tools && (
@@ -325,7 +339,7 @@ export function ChatErrorBanner({ onOpenSettings }: { onOpenSettings: () => void
   if (!chatError) return null
   return (
     <div className="shrink-0 px-8">
-      <div className="mx-auto flex max-w-[760px] items-start gap-2.5 rounded-[12px] border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2.5">
+      <div className="mx-auto flex max-w-[760px] items-start gap-2.5 rounded-[16px] border border-[var(--danger)] bg-[var(--danger-soft)] px-3.5 py-2.5">
         <AlertCircle size={15} className="mt-0.5 shrink-0 text-[var(--danger)]" />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-medium text-[var(--fg)]">{chatError.title}</p>
@@ -346,16 +360,15 @@ export function ChatErrorBanner({ onOpenSettings }: { onOpenSettings: () => void
 /* ------------------------------------------------------------------- composer */
 
 export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; onOpenSettings: () => void }) {
-  const { sendMessage, streaming, stopStreaming, modelId, setModelId, models, providers, demoMode, toast } = useNexus()
-  const [text, setText] = useState('')
+  const { sendMessage, streaming, stopStreaming, modelId, setModelId, models, providers, demoMode, toast, draft, setDraft } = useNexus()
   const ta = useRef<HTMLTextAreaElement>(null)
   const model = models.find((m) => m.id === modelId) ?? models[0]
   const provider = providers.find((p) => p.id === model?.providerId)
 
   const send = () => {
-    if (!text.trim() || streaming) return
-    sendMessage(text)
-    setText('')
+    if (!draft.trim() || streaming) return
+    sendMessage(draft)
+    setDraft('')
   }
 
   // 输入框随内容长高（最多 10rem），避免长文本只能在小窗里滚动
@@ -364,7 +377,7 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  }, [text])
+  }, [draft])
 
   return (
     <div className={cn('shrink-0 border-t border-[var(--line)] bg-[var(--bg)]', dense ? 'px-3 py-2.5' : 'px-8 py-3')}>
@@ -378,11 +391,11 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
             </Button>
           </div>
         )}
-        <div className="rounded-[16px] border border-[var(--line)] bg-[var(--surface)] focus-within:border-[var(--accent)]">
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-1)] transition-shadow focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-8)]">
           <textarea
             ref={ta}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               // 触屏键盘上 Enter 应该换行；物理键盘仍保留 Enter 发送、Shift+Enter 换行
               const coarse = window.matchMedia('(pointer: coarse)').matches
@@ -466,11 +479,11 @@ export function Composer({ dense = false, onOpenSettings }: { dense?: boolean; o
             ) : (
               <Button
                 size="sm"
-                variant={text.trim() ? 'primary' : 'quiet'}
+                variant={draft.trim() ? 'primary' : 'quiet'}
                 onClick={send}
-                disabled={!text.trim()}
+                disabled={!draft.trim()}
                 aria-label="发送消息"
-                className="!h-8 !w-9 !px-0"
+                className="!h-9 !w-9 !rounded-full !px-0 disabled:opacity-100"
               >
                 <ArrowUp size={16} />
               </Button>

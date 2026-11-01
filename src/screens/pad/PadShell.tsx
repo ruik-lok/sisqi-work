@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Bell, Command, FolderKanban, MessagesSquare, Plug, Search, Settings2, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { Button, IconButton, Segmented, StatusPill } from '../../components/ui/primitives'
@@ -47,7 +47,7 @@ export function PadShell({
   return (
     <div className="flex h-full min-h-0 bg-[var(--bg)] text-[var(--fg)]">
       {/* sidebar */}
-      <aside className="flex w-[228px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
+      <aside className="flex w-[232px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface-2)]">
         <div className="flex h-14 items-center px-4">
           <Wordmark />
         </div>
@@ -77,7 +77,7 @@ export function PadShell({
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'relative flex h-10 items-center gap-2.5 rounded-[10px] px-2.5 text-[14px] transition-colors duration-150',
-                  active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
+                  active ? 'bg-[var(--surface)] text-[var(--accent)] shadow-[var(--shadow-1)]' : 'text-[var(--muted)] hover:bg-[var(--surface)]/70 hover:text-[var(--fg)]',
                 )}
               >
                 {n.icon}

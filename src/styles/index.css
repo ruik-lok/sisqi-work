@@ -1,16 +1,16 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   思祁.Work · Design tokens v2.0
-   Solid Surface UI：不透明表面、背景色差 + 1px 边框 + 留白建立层级。
-   禁止毛玻璃 / backdrop blur / 大面积半透明叠层 / 发光。
-   主题：Arctic Blue（亮）· Midnight Blue（暗）· 跟随系统
+   思祁.Work · Design tokens v3.0（DeepSeek 蓝 + ChatGPT 中性底）
+   干净留白、柔和圆角、几乎不用硬边框；强调色只出现在操作与当前状态。
+   主题：Arctic（亮）· Midnight（暗）· 跟随系统
    ------------------------------------------------------------------ */
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-elevated: var(--elevated);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
@@ -24,15 +24,17 @@
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-info: var(--info);
+  --color-bubble: var(--bubble);
 
-  --font-ui: "Inter", "KaiTi", "STKaiti", "Kaiti SC", "楷体", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-ui: "Inter", -apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Noto Sans SC",
+    "Microsoft YaHei", system-ui, sans-serif;
   --font-sans: var(--font-ui);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-  --radius-sm: 8px;
-  --radius-md: 11px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
 
   --text-caption: 0.6875rem;
   --text-caption--line-height: 1rem;
@@ -52,64 +54,68 @@
   --text-3xl--line-height: 2.5rem;
 }
 
-/* 亮色：Arctic Blue */
+/* 亮色：Arctic（白底 + DeepSeek 蓝） */
 :root,
 html[data-theme="light"] {
-  --bg: #f4f7fc;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #eaf0f8;
+  --surface-2: #f4f6fb;
+  --surface-3: #eceff7;
   --elevated: #ffffff;
-  --line: #dce5f0;
-  --line-strong: #c3d2e4;
-  --fg: #17263d;
-  --muted: #61738c;
-  --faint: #8290a3;
-  --accent: #1769d2;
-  --accent-soft: #e2eeff;
+  --line: #ebeff6;
+  --line-strong: #d8dfec;
+  --fg: #1b2030;
+  --muted: #5b6579;
+  --faint: #8b95a8;
+  --accent: #4d6bfe;
+  --accent-soft: #eef2ff;
   --on-accent: #ffffff;
-  --accent-8: rgba(23, 105, 210, 0.08);
-  --accent-14: rgba(23, 105, 210, 0.14);
-  --ok: #1c7a4e;
-  --ok-soft: #e3f3ea;
-  --warn: #94600a;
-  --warn-soft: #fdf0da;
-  --danger: #ad2a21;
-  --danger-soft: #fbe7e5;
-  --info: #1769d2;
-  --info-soft: #e2eeff;
-  --scrim: rgba(15, 27, 45, 0.42);
-  --shadow-1: 0 1px 2px rgba(23, 38, 61, 0.06);
-  --shadow-2: 0 12px 32px -12px rgba(23, 38, 61, 0.18);
+  --accent-8: rgba(77, 107, 254, 0.08);
+  --accent-14: rgba(77, 107, 254, 0.14);
+  --ok: #0f9d6e;
+  --ok-soft: #e8f7f0;
+  --warn: #b26a00;
+  --warn-soft: #fff5e6;
+  --danger: #d23d3d;
+  --danger-soft: #fdeeee;
+  --info: #4d6bfe;
+  --info-soft: #eef2ff;
+  --bubble: #eef2ff;
+  --scrim: rgba(17, 24, 39, 0.38);
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-2: 0 16px 40px -20px rgba(16, 24, 40, 0.22);
   color-scheme: light;
 }
 
-/* 暗色：Midnight Blue */
+/* 暗色：Midnight（近黑中性底 + 亮蓝） */
 html[data-theme="dark"] {
-  --bg: #0c1422;
-  --surface: #121e30;
-  --surface-2: #192940;
-  --elevated: #20334d;
-  --line: #263b57;
-  --line-strong: #35506f;
-  --fg: #f0f5ff;
-  --muted: #9aabc4;
-  --faint: #71839d;
-  --accent: #72b3ff;
-  --accent-soft: #1b3555;
-  --on-accent: #06152a;
-  --accent-8: rgba(114, 179, 255, 0.1);
-  --accent-14: rgba(114, 179, 255, 0.18);
-  --ok: #5fc08e;
-  --ok-soft: #16301f;
-  --warn: #e0a44e;
-  --warn-soft: #33240f;
-  --danger: #ff7a70;
-  --danger-soft: #3a1a18;
-  --info: #72b3ff;
-  --info-soft: #1b3555;
-  --scrim: rgba(4, 9, 16, 0.62);
-  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.2);
-  --shadow-2: 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+  --bg: #191a1e;
+  --surface: #202127;
+  --surface-2: #26272e;
+  --surface-3: #2d2e36;
+  --elevated: #2a2b32;
+  --line: #303139;
+  --line-strong: #3c3e48;
+  --fg: #edeef3;
+  --muted: #a2a8b6;
+  --faint: #777d8c;
+  --accent: #7d93ff;
+  --accent-soft: #252b45;
+  --on-accent: #0b1020;
+  --accent-8: rgba(125, 147, 255, 0.1);
+  --accent-14: rgba(125, 147, 255, 0.18);
+  --ok: #43c08d;
+  --ok-soft: #17301f;
+  --warn: #e2a453;
+  --warn-soft: #33260f;
+  --danger: #ff7d7d;
+  --danger-soft: #3a1c1c;
+  --info: #7d93ff;
+  --info-soft: #252b45;
+  --bubble: #252b45;
+  --scrim: rgba(0, 0, 0, 0.58);
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.24);
+  --shadow-2: 0 18px 44px -22px rgba(0, 0, 0, 0.8);
   color-scheme: dark;
 }
 
@@ -144,7 +150,7 @@ html[data-theme="dark"] {
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 10px;
   }
 
   button,
@@ -158,7 +164,7 @@ html[data-theme="dark"] {
   button:disabled,
   [aria-disabled="true"] {
     cursor: not-allowed;
-    opacity: 0.42;
+    opacity: 0.45;
   }
 
   input,
@@ -176,7 +182,7 @@ html[data-theme="dark"] {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: color-mix(in oklab, var(--faint) 45%, transparent);
+    background: color-mix(in oklab, var(--faint) 40%, transparent);
     border: 3px solid transparent;
     border-radius: 99px;
     background-clip: content-box;
@@ -222,14 +228,20 @@ html[data-theme="dark"] {
     font-variant-numeric: tabular-nums;
   }
 
+  /* 卡片：柔和填充 + 极淡描边，取代旧版"处处描边" */
   .surface-1 {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
   }
 
+  .card-soft {
+    background: var(--surface-2);
+    border-radius: var(--radius-lg);
+  }
+
   .anim-rise {
-    animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: rise 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   .anim-fade {
     animation: fade 0.18s ease-out both;
@@ -244,7 +256,7 @@ html[data-theme="dark"] {
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;

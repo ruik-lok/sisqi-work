@@ -102,6 +102,9 @@ interface Store {
   /* chat */
   messages: ChatMessage[]
   streaming: boolean
+  /** 输入框草稿：空状态的建议卡片点击后填入，Composer 与 ChatThread 共用 */
+  draft: string
+  setDraft: (text: string) => void
   chatError: ChatError | null
   sendMessage: (text: string) => void
   stopStreaming: () => void
@@ -232,6 +235,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
   })
 
   const [streaming, setStreaming] = useState(false)
+  const [draft, setDraft] = useState('')
   const [chatError, setChatError] = useState<ChatError | null>(null)
   const [usage, setUsage] = useState<UsageState>(() => initial.usage ?? { requests: 0, promptTokens: 0, completionTokens: 0, costUsd: 0, lastLatencyMs: null, lastErrorAt: null })
 
@@ -780,6 +784,8 @@ export function NexusProvider({ children }: { children: ReactNode }) {
       togglePin,
       messages,
       streaming,
+      draft,
+      setDraft,
       chatError,
       sendMessage,
       stopStreaming,
@@ -866,6 +872,7 @@ export function NexusProvider({ children }: { children: ReactNode }) {
     setProviderKey,
     stopStreaming,
     streaming,
+    draft,
     tasks,
     testProvider,
     toggleProvider,

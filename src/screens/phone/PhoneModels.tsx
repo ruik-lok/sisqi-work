@@ -80,7 +80,7 @@ export function PhoneModels() {
             <button
               key={p.id}
               onClick={() => open(p)}
-              className="flex w-full items-center gap-2.5 rounded-[10px] border border-[var(--line)] bg-[var(--bg)] px-2.5 py-2 text-left"
+              className="flex w-full items-center gap-2.5 rounded-[12px] bg-[var(--surface-2)] px-2.5 py-2 text-left"
             >
               <span className="grid size-7 shrink-0 place-items-center rounded-[8px] bg-[var(--surface-2)] text-[var(--faint)]">
                 <KeyRound size={13} />

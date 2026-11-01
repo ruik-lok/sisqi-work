@@ -53,7 +53,7 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         // 页面来自 assets：禁用缓存，升级 APK 后不会再跑到旧的 index.html / JS
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        web.setBackgroundColor(Color.parseColor("#0C1422"));
+        web.setBackgroundColor(Color.parseColor("#191A1E"));
         // 状态栏/导航栏跟随页面主题：页面里的 index.html 会在主题变化时调用 SisqiHost.setChrome('light'|'dark')
         secrets = new SecretStore(this);
         web.addJavascriptInterface(new Host(), "SisqiHost");
@@ -181,8 +181,8 @@ public class MainActivity extends Activity {
     }
 
     private void applyChrome(boolean light) {
-        final int bg = Color.parseColor(light ? "#F4F7FC" : "#0C1422");
-        final int nav = Color.parseColor(light ? "#FFFFFF" : "#121E30");
+        final int bg = Color.parseColor(light ? "#FFFFFF" : "#191A1E");
+        final int nav = Color.parseColor(light ? "#FFFFFF" : "#202127");
         runOnUiThread(new Runnable() {
             public void run() {
                 Window w = getWindow();

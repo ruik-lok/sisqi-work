@@ -63,7 +63,7 @@ export function PhoneShell({
       {/* 状态栏安全区域：背景延伸，内容避让；不使用假图标 */}
       <div className="h-[var(--safe-top,26px)] shrink-0 bg-[var(--bg)]" aria-hidden="true" />
 
-      <header className="flex h-12 shrink-0 items-center gap-2 bg-[var(--bg)] px-4">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-4">
         <Wordmark compact />
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-[var(--fg)]">
           {route === 'chat'
@@ -128,7 +128,7 @@ export function PhoneShell({
           <div className="h-full overflow-y-auto px-4 py-3">
             <div className="space-y-2">
               {connectors.slice(0, 6).map((c) => (
-                <div key={c.id} className="flex items-center gap-2.5 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
+                <div key={c.id} className="flex items-center gap-2.5 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
                   <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] text-[var(--muted)]">
                     <Plug size={15} />
                   </span>
@@ -151,7 +151,7 @@ export function PhoneShell({
 
         {route === 'settings' && (
           <div className="h-full overflow-y-auto px-4 py-3">
-            <section className="rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
+            <section className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
               <div className="flex items-center gap-2">
                 <span className="text-[13.5px] text-[var(--fg)]">外观</span>
                 <span className="ml-auto">
@@ -193,7 +193,7 @@ export function PhoneShell({
 
             <PhoneModels />
 
-            <section className="mt-2 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
+            <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
               <div className="flex items-center gap-2">
                 <span className="text-[13.5px] text-[var(--fg)]">设备</span>
                 <StatusPill label={deviceStatusLabel(phone.status)} tone="ok" className="ml-auto" />
@@ -204,7 +204,7 @@ export function PhoneShell({
               <p className="text-[11.5px] text-[var(--faint)]">Root Provider 待检测 · 与平板独立授权</p>
             </section>
 
-            <section className="mt-2 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
+            <section className="mt-2 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
               <div className="flex items-center justify-between">
                 <span className="text-[13.5px] text-[var(--fg)]">用量 · {usage.period}</span>
                 <Badge tone="neutral">{usage.requests} 次</Badge>
@@ -295,7 +295,7 @@ function PhoneProjects() {
           <button
             key={p.name}
             onClick={() => toast({ title: `打开 ${p.name}`, detail: '手机端以查看与审批为主，编辑建议在平板', tone: 'neutral' })}
-            className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
+            className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-3 py-3 text-left"
           >
             <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--accent)]">
               {p.name.slice(0, 2).toUpperCase()}
@@ -308,7 +308,7 @@ function PhoneProjects() {
           </button>
         ))}
       </div>
-      <div className="mt-3 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] p-3">
+      <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
         <p className="text-[12px] text-[var(--fg)]">最近编辑</p>
         <p className="mt-1 font-mono text-[11.5px] text-[var(--faint)]">core/agent/harness/AgentLoop.kt</p>
         <p className="text-[11px] text-[var(--faint)]">分支 agent/harness-checkpoint · 检查点 ckpt_0007</p>
